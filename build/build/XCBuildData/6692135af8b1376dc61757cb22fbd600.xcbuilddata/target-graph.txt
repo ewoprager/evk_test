@@ -1,4 +1,0 @@
-Target dependency graph (2 targets)
-Target 'evk_test' in project 'evk_test'
-➜ Explicit dependency on target 'ZERO_CHECK' in project 'evk_test'
-Target 'ZERO_CHECK' in project 'evk_test' (no dependencies)

@@ -1,3 +1,0 @@
-/Users/eprager/Projects/General/evk_test/build/CMakeFiles/evk_test.dir
-/Users/eprager/Projects/General/evk_test/build/CMakeFiles/ALL_BUILD.dir
-/Users/eprager/Projects/General/evk_test/build/CMakeFiles/ZERO_CHECK.dir
