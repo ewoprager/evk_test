@@ -40,11 +40,6 @@ target_include_directories(${PROJECT_NAME} PUBLIC
                            "${CMAKE_CURRENT_SOURCE_DIR}/include/"
 						   "/usr/local/include/"
                            "/Users/eprager/local/include/"
-                           "/Users/eprager/local/include/mat4x4/"
-                           "/Users/eprager/local/include/ESDL/"
-                           "/Users/eprager/local/include/evk/"
-                           "/Users/eprager/local/include/vulkan/"
-                           "/opt/local/include/SDL2/"
                            "/opt/local/include/"
                            )
 
@@ -62,5 +57,5 @@ target_link_libraries(${PROJECT_NAME}
                       SDL2_image
                       vulkan
                       evk
-                      mat4x4
+                      mattresses
                       )

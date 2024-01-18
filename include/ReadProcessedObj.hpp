@@ -1,7 +1,7 @@
 #ifndef ReadProcessedObj_hpp
 #define ReadProcessedObj_hpp
 
-#include <mat4x4/vec3.hpp>
+#include <mattresses.h>
 #include <cstdint>
 #include <stdlib.h>
 
@@ -36,9 +36,9 @@ template <unsigned int d, typename T> struct obj_array_struct {
 struct obj_v : obj_array_struct<3, float> {};
 struct obj_vt : obj_array_struct<2, float> {};
 struct obj_vn : obj_array_struct<3, float> {};
-vec3 OBJVToVector(obj_v OBJvertex);
-obj_v VectorToOBJV(vec3 vec);
-obj_vn VectorToOBJVN(vec3 vec);
+vec<3> OBJVToVector(obj_v OBJvertex);
+obj_v VectorToOBJV(vec<3> vec);
+obj_vn VectorToOBJVN(vec<3> vec);
 
 // allocates both the `vertices` and `divisionData` arrays in the returned struct (so they need to be freed eventually)
 ObjectData ReadProcessedOBJFile(const char *file, uint32_t (*mtlNameToTextureId)(const char *));

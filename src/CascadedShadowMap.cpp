@@ -13,21 +13,21 @@ void UpdateCascades(Shared_Main::UBO_Global *mainUboGlobal, Shared_Shadow::UBO_G
 	// Based on method presented in https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch10.html
 	const float smccInv = 1.0f/(float)SHADOW_MAP_CASCADE_COUNT;
 	const float pThRootOfRatio = powf(ratio, smccInv);
-	float minZpThRootOfRatioToTheI = minZ*pThRootOfRatio;
+	float minZpThRootOfRatioToTheI = minZ * pThRootOfRatio;
 	for(int i=0; i<SHADOW_MAP_CASCADE_COUNT; i++){
-		float uniform = minZ + range*(float)(i + 1)*smccInv;
+		float uniform = minZ + range * float(i + 1) * smccInv;
 		float d = Globals::cascadeSplitLambda*(minZpThRootOfRatioToTheI - uniform) + uniform;
-		cascadeSplits[i] = (d - minZ)/range;
+		cascadeSplits[i] = (d - minZ) / range;
 		
 		minZpThRootOfRatioToTheI *= pThRootOfRatio;
 	}
 	
 	// Calculate orthographic projection matrix for each cascade
 	float lastSplitDist = 0.0;
-	for(int i=0; i<SHADOW_MAP_CASCADE_COUNT; i++){
+	for(int i=0; i<SHADOW_MAP_CASCADE_COUNT; ++i){
 		float splitDist = cascadeSplits[i];
 
-		vec3 frustumCorners[8] = {
+		vec<3> frustumCorners[8] = {
 			{-1.0f, 1.0f, 0.0f},
 			{ 1.0f, 1.0f, 0.0f},
 			{ 1.0f,-1.0f, 0.0f},
@@ -39,23 +39,21 @@ void UpdateCascades(Shared_Main::UBO_Global *mainUboGlobal, Shared_Shadow::UBO_G
 		};
 
 		// Project frustum corners into world space
-		float viewProjection[4][4];
-		M4x4_Multiply(mainUboGlobal->proj, mainUboGlobal->viewInv, viewProjection);
-		float invCam[4][4];
-		M4x4_Inverse(viewProjection, invCam);
+		mat<4, 4> viewProjection = Dot(mainUboGlobal->proj, mainUboGlobal->viewInv);
+		mat<4, 4> invCam = viewProjection.Inverted();
 		for(int i=0; i<8; i++){
-			vec4 invCorner = M4x4_Multiply(invCam, frustumCorners[i] | 1.0f);
-			frustumCorners[i] = invCorner.xyz()/invCorner.w;
+			vec<4> invCorner = Dot(invCam, frustumCorners[i] | 1.0f);
+			frustumCorners[i] = (vec<3>){invCorner.x, invCorner.y, invCorner.z} / invCorner.w;
 		}
 
 		for(int i=0; i<4; i++){
-			vec3 dist = frustumCorners[i + 4] - frustumCorners[i];
+			vec<3> dist = frustumCorners[i + 4] - frustumCorners[i];
 			frustumCorners[i + 4] = frustumCorners[i] + (dist * splitDist);
 			frustumCorners[i] = frustumCorners[i] + (dist * lastSplitDist);
 		}
 	
 		// Get frustum center
-		vec3 frustumCenter = {0.0f, 0.0f, 0.0f};
+		vec<3> frustumCenter {0.0f, 0.0f, 0.0f};
 		for(int i=0; i<8; i++) frustumCenter += frustumCorners[i];
 		frustumCenter *= 0.125f;
 
@@ -66,16 +64,13 @@ void UpdateCascades(Shared_Main::UBO_Global *mainUboGlobal, Shared_Shadow::UBO_G
 		}
 		radius = ceilf(radius*16.0f)/16.0f;
 
-		float lightViewMatrix[4][4];
-		M4x4_LookAt(frustumCenter - radius*Globals::lightDirection, frustumCenter, {0.0f, 0.0f, 1.0f}, lightViewMatrix);
-		M4x4_Inverse(lightViewMatrix, lightViewMatrix);
-		float lightOrthoMatrix[4][4];
-		M4x4_Orthographic(-radius, radius, -radius, radius, 0.0f, 2.0f*radius, lightOrthoMatrix);
+		mat<4, 4> lightViewMatrix = mat<4, 4>::LookAt(frustumCenter - radius*Globals::lightDirection, frustumCenter, {0.0f, 0.0f, 1.0f}).Inverted();
+		mat<4, 4> lightOrthoMatrix = mat<4, 4>::OrthographicProjection(-radius, radius, -radius, radius, 0.0f, 2.0f*radius);
 		
 		// Store split distance and matrix in cascade
-		mainUboGlobal->cascadeSplits[i] = (minZ + splitDist*range) * -1.0f;
-		M4x4_Multiply(lightOrthoMatrix, lightViewMatrix, mainUboGlobal->lightMat[i]);
-		memcpy(shadowUboGlobal->viewInvProj[i], mainUboGlobal->lightMat[i], 16*sizeof(float));
+		mainUboGlobal->cascadeSplits[i] = (minZ + splitDist * range) * -1.0f;
+		mainUboGlobal->lightMat[i] = Dot(lightOrthoMatrix, lightViewMatrix);
+		shadowUboGlobal->viewInvProj[i] = mainUboGlobal->lightMat[i];
 		
 		lastSplitDist = cascadeSplits[i];
 	}

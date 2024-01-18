@@ -121,7 +121,7 @@ ObjectData objDatas[OBJ_DATAS_N];
 
 class Player : public Rendered::Once {
 public:
-	Player(int _index, const vec2 &_position) : Rendered::Once(_index, objDatas[(int)ObjData::player]/*ReadProcessedOBJFile("ProcessedObjFiles/MaleLow.bin", &GetTextureIdFromMtl)*/), position(_position | 50.0f) {
+	Player(int _index, const vec<2> &_position) : Rendered::Once(_index, objDatas[(int)ObjData::player]/*ReadProcessedOBJFile("ProcessedObjFiles/MaleLow.bin", &GetTextureIdFromMtl)*/), position(_position | 50.0f) {
 		SDL_Event event;
 		event.type = SDL_MOUSEMOTION;
 		mmEID = ESDL::AddEventCallback((MemberFunction<Player, void, SDL_Event>){this, &Player::MouseMoved}, event);
@@ -142,18 +142,14 @@ public:
 		const float sy = sinf(yaw);
 		const float forward = (float)(ESDL::GetKeyDown(SDLK_w) - ESDL::GetKeyDown(SDLK_s));
 		const float right = (float)(ESDL::GetKeyDown(SDLK_d) - ESDL::GetKeyDown(SDLK_a));
-		position += speed*dT*(vec3){forward*cy + right*sy, forward*sy - right*cy, (float)(ESDL::GetKeyDown(SDLK_SPACE) - ESDL::GetKeyDown(SDLK_LSHIFT))};
+		position += speed*dT*(vec<3>){forward*cy + right*sy, forward*sy - right*cy, (float)(ESDL::GetKeyDown(SDLK_SPACE) - ESDL::GetKeyDown(SDLK_LSHIFT))};
 		
-		float a[4][4];
-		M4x4_Scaling({2.0f, 2.0f, 2.0f}, perObjectDataPtr->model);
-		M4x4_xRotation(0.5*M_PI, a);
-		M4x4_PreMultiply(perObjectDataPtr->model, a);
-		M4x4_zRotation(0.5*M_PI + yaw, a);
-		M4x4_PreMultiply(perObjectDataPtr->model, a);
-		M4x4_Translation({position.x, position.y, 0.0}, a);
-		M4x4_PreMultiply(perObjectDataPtr->model, a);
-		M4x4_Inverse(perObjectDataPtr->model, a);
-		M4x4_Transpose(a, perObjectDataPtr->modelInvT);
+		perObjectDataPtr->model = Dot(Dot(mat<4, 4>::Translation((vec<2>){position.x, position.y} | 0.0f),
+																		  mat<4, 4>::ZRotation(0.5f * float(M_PI) + yaw)),
+																	  Dot(mat<4, 4>::XRotation(0.5f * float(M_PI)),
+																		  mat<4, 4>::Scaling({2.0f, 2.0f, 2.0f})));
+		
+		perObjectDataPtr->modelInvT = perObjectDataPtr->model.Inverted().Transposed();
 	}
 	
 	void MouseMoved(SDL_Event event){
@@ -161,23 +157,19 @@ public:
 		cursorY += event.motion.yrel;
 	}
 	
-	const float (&GetViewInverseMatrix())[4][4]{
-		float a[4][4];
-		M4x4_xRotation(0.5f*M_PI + pitch, viewInverseMatrix);
-		M4x4_zRotation(-0.5f*M_PI + yaw, a);
-		M4x4_PreMultiply(viewInverseMatrix, a);
-		M4x4_Translation(position, a);
-		M4x4_PreMultiply(viewInverseMatrix, a);
-		M4x4_Inverse(viewInverseMatrix, viewInverseMatrix);
+	const mat<4, 4> &GetViewInverseMatrix(){
+		viewInverseMatrix = (Dot(Dot(mat<4, 4>::Translation(position),
+									 mat<4, 4>::ZRotation(-0.5f * float(M_PI) + yaw)),
+								 mat<4, 4>::XRotation(0.5f * float(M_PI) + pitch))).Inverted();
 		return viewInverseMatrix;
 	}
 	
-	const vec3 &GetCameraPosition(){ return position; }
+	const vec<3> &GetCameraPosition(){ return position; }
 	
 private:
-	float viewInverseMatrix[4][4];
+	mat<4, 4> viewInverseMatrix;
 	
-	vec3 position;
+	vec<3> position;
 	float speed = 200.0f;
 	int cursorX, cursorY;
 	float yaw;
@@ -205,31 +197,27 @@ public:
 	}
 	
 	void Update(float dT, Shared_Main::PerObject *perObjectDataPtr) override {
-		float a[4][4];
 		
-		M4x4_xRotation(M_PI*0.5f, perObjectDataPtr->model);
-		M4x4_zRotation(angle, a);
-		M4x4_PreMultiply(perObjectDataPtr->model, a);
-		M4x4_Translation({position.x, position.y, 0.0f}, a);
-		M4x4_PreMultiply(perObjectDataPtr->model, a);
+		perObjectDataPtr->model = Dot(Dot(mat<4, 4>::Translation(position | 0.0f),
+																		  mat<4, 4>::ZRotation(angle)),
+																	  mat<4, 4>::XRotation(0.5f * float(M_PI)));
 		
-		M4x4_Inverse(perObjectDataPtr->model, a);
-		M4x4_Transpose(a, perObjectDataPtr->modelInvT);
+		perObjectDataPtr->modelInvT = perObjectDataPtr->model.Inverted().Transposed();
 		
-		memcpy(&savedInstanceData, perObjectDataPtr, sizeof(Shared_Main::PerObject));
+		savedInstanceData = *perObjectDataPtr;
 		
-		angle += dT*spinSpeed;
+		angle += dT * spinSpeed;
 		const int fb = ESDL::GetKeyDown(SDLK_UP) - ESDL::GetKeyDown(SDLK_DOWN);
 		const int rl = ESDL::GetKeyDown(SDLK_RIGHT) - ESDL::GetKeyDown(SDLK_LEFT);
-		vec2 vel = speed*((float)fb*(vec2){-1.0f, 0.0f} + (float)rl*(vec2){0.0f, 1.0f});
+		vec<2> vel = speed*(float(fb) * (vec<2>){-1.0f, 0.0f} + float(rl) * (vec<2>){0.0f, 1.0f});
 		if(fb && rl) vel *= 0.70712f;
-		position += vel*dT;
+		position += vel * dT;
 	}
 	
-	const Shared_Main::PerObject *GetInstanceData() const { return &savedInstanceData; }
+	const Shared_Main::PerObject &GetInstanceData() const { return savedInstanceData; }
 	
 private:
-	vec2 position;
+	vec<2> position;
 	float angle;
 	float spinSpeed = 1.0f;
 	float speed = 100.0f;
@@ -243,18 +231,11 @@ public:
 	ChainSaw(int _index, ChairInstance *_chair) : Rendered::Once(_index, objDatas[(int)ObjData::chainsaw]/*ReadProcessedOBJFile("ProcessedObjFiles/chainsaw.bin", &GetTextureIdFromMtl)*/), chair(_chair) {}
 	
 	void Update(float dT, Shared_Main::PerObject *perObjectDataPtr) override {
-		memcpy(perObjectDataPtr, chair->GetInstanceData(), sizeof(Shared_Main::PerObject));
-		float a[4][4];
-		M4x4_Translation({-5.0f, 27.0f, 0.0f}, a);
-		M4x4_PostMultiply(perObjectDataPtr->model, a);
-		M4x4_zRotation(-0.5f*M_PI, a);
-		M4x4_PostMultiply(perObjectDataPtr->model, a);
-		M4x4_xRotation(0.5f*M_PI, a);
-		M4x4_PostMultiply(perObjectDataPtr->model, a);
-		M4x4_Scaling({5.0f, 5.0f, 5.0f}, a);
-		M4x4_PostMultiply(perObjectDataPtr->model, a);
-		M4x4_Inverse(perObjectDataPtr->model, a);
-		M4x4_Transpose(a, perObjectDataPtr->modelInvT);
+		*perObjectDataPtr = chair->GetInstanceData();
+		
+		perObjectDataPtr->model = Dot(Dot(Dot(perObjectDataPtr->model, mat<4, 4>::Translation({-5.0f, 27.0f, 0.0f})), Dot(mat<4, 4>::Scaling({5.0f, 5.0f, 5.0f}), mat<4, 4>::ZRotation(-0.5f * float(M_PI)))), mat<4, 4>::XRotation(0.5f * float(M_PI)));
+		
+		perObjectDataPtr->modelInvT = perObjectDataPtr->model.Inverted().Transposed();
 	}
 	
 	void Render(const GraphicsPipeline &pipeline, Shared_Main::PushConstants_Vert *vertPcs, Shared_Main::PushConstants_Frag *fragPcs, Shared_Shadow::PushConstants_Vert *shadPcs) override {
@@ -273,8 +254,8 @@ public:
 	}
 	
 	void Update(float dT, Shared_Main::PerObject *perObjectData) override {
-		M4x4_Identity(perObjectData->model);
-		M4x4_Identity(perObjectData->modelInvT);
+		perObjectData->model = mat<4, 4, float32_t>::Identity();
+		perObjectData->modelInvT = mat<4, 4, float32_t>::Identity();
 	}
 	
 	void Render(const GraphicsPipeline &pipeline, Shared_Main::PushConstants_Vert *vertPcs, Shared_Main::PushConstants_Frag *fragPcs, Shared_Shadow::PushConstants_Vert *shadPcs) override {
@@ -301,31 +282,31 @@ void Update(float dT, Shared_Main::PushConstants_Vert &vertPcs, Shared_Main::Pus
 	for(int i=0; i<Globals::MainOnce::renderedN; i++) renderedOnce[i]->Update(dT, uboPerObjectPointers[i]);
 	
 	// Setting main global UBO
-	memcpy(uboGlobalPointer->viewInv, player->GetViewInverseMatrix(), 16*sizeof(float));
-	M4x4_Perspective(M_PI*0.25f, (float)vulkanPtr->GetExtentWidth()/(float)vulkanPtr->GetExtentHeight(), Globals::cameraZNear, Globals::cameraZFar, uboGlobalPointer->proj);
+	uboGlobalPointer->viewInv = player->GetViewInverseMatrix();
+	uboGlobalPointer->proj = mat<4, 4>::PerspectiveProjection(M_PI*0.25f, (float)vulkanPtr->GetExtentWidth()/(float)vulkanPtr->GetExtentHeight(), Globals::cameraZNear, Globals::cameraZFar);
 	uboGlobalPointer->proj[1][1] *= -1.0f;
-	memcpy(uboGlobalPointer->lightDir, &Globals::lightDirection, sizeof(vec3));
-	const vec4 sunColour = {0.9882352941f, 0.8980392157f, 0.4392156863f, 1.0f};
-	memcpy(uboGlobalPointer->lightColour, &sunColour, sizeof(vec4));
-	memcpy(uboGlobalPointer->cameraPosition, &player->GetCameraPosition(), sizeof(vec3));
+	uboGlobalPointer->lightDir = Globals::lightDirection | 0.0f; // should do lhs.xyz = rhs
+	const vec<4> sunColour = {0.9882352941f, 0.8980392157f, 0.4392156863f, 1.0f};
+	uboGlobalPointer->lightColour = sunColour;
+	uboGlobalPointer->cameraPosition = player->GetCameraPosition() | 1.0f;
 	
 	// Setting shadow UBO and main lightMats
 	UpdateCascades(uboGlobalPointer, uboShadowPointer);
 	
 	// Setting skybox UBO
-	memcpy(uboSkyboxPointer->viewInv, uboGlobalPointer->viewInv, 16*sizeof(float));
+	uboSkyboxPointer->viewInv = uboGlobalPointer->viewInv;
 	uboSkyboxPointer->viewInv[3][0] = uboSkyboxPointer->viewInv[3][1] = uboSkyboxPointer->viewInv[3][2] = 0.0f; // removing translational component
-	memcpy(uboSkyboxPointer->proj, uboGlobalPointer->proj, 16*sizeof(float));
+	uboSkyboxPointer->proj = uboGlobalPointer->proj;
 	uboSkyboxPointer->proj[2][2] = -1.0f; uboSkyboxPointer->proj[3][2] = 0.0f; // fix the depth at 1.0
-	memcpy(uboSkyboxPointer->cameraPosition, &player->GetCameraPosition(), sizeof(vec3));
+	uboSkyboxPointer->cameraPosition = player->GetCameraPosition() | 1.0f;
 	
 	// vertex shader push constants
 	//currently placeholder
 	
 	// fragment shader push constants
-	const vec4 white = {1.0f, 1.0f, 1.0f, 1.0f};
-	memcpy(&fragPcs.colourMult, &white, sizeof(vec4));
-	memcpy(&fragPcs.specular, &white, sizeof(vec4));
+	const vec<4> white = {1.0f, 1.0f, 1.0f, 1.0f};
+	fragPcs.colourMult = white;
+	fragPcs.specular = white;
 	fragPcs.shininess = 100.0f;
 	fragPcs.specularFactor = 0.05f;
 	

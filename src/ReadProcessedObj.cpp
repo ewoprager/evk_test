@@ -12,17 +12,17 @@ struct obj_smoothVertex {
 	obj_vn vn;
 	obj_vt vt;
 };
-vec3 OBJVToVector(obj_v OBJvertex){
+vec<3> OBJVToVector(obj_v OBJvertex){
 	return {OBJvertex[0], OBJvertex[1], OBJvertex[2]};
 }
-obj_v VectorToOBJV(vec3 vec){
+obj_v VectorToOBJV(vec<3> vec){
 	obj_v ret;
 	ret[0] = vec.x;
 	ret[1] = vec.y;
 	ret[2] = vec.z;
 	return ret;
 }
-obj_vn VectorToOBJVN(vec3 vec){
+obj_vn VectorToOBJVN(vec<3> vec){
 	obj_vn ret;
 	ret[0] = vec.x;
 	ret[1] = vec.y;

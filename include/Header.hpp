@@ -4,7 +4,7 @@
 #include <map>
 #include <sys/time.h>
 
-#include <mat4x4/vec2.hpp>
+#include <mattresses.h>
 #include <ESDL/ESDL_General.hpp>
 #include <ESDL/ESDL_EventHandler.hpp>
 #include <evk/Base.hpp>
@@ -128,9 +128,9 @@ struct Pipeline_MainOnce {
 	
 	struct Attributes {
 		struct Vertex {
-			float32_t position[3];
-			float32_t normal[3];
-			float32_t texCoord[2];
+			vec<3, float32_t> position;
+			vec<3, float32_t> normal;
+			vec<2, float32_t> texCoord;
 		};
 		
 		static constexpr VkPipelineVertexInputStateCreateInfo stateCI = {
@@ -166,8 +166,8 @@ struct Shared_Main {
 		int32_t placeHolder[4];
 	};
 	struct PushConstants_Frag {
-		float32_t colourMult[4];
-		float32_t specular[4];
+		vec<4, float32_t> colourMult;
+		vec<4, float32_t> specular;
 		float32_t shininess;
 		float32_t specularFactor;
 		int32_t textureID;
@@ -175,20 +175,20 @@ struct Shared_Main {
 	enum class PushConstantRange {vert, frag};
 	
 	struct UBO_Global {
-		float32_t lightMat[SHADOW_MAP_CASCADE_COUNT][4][4];
-		float32_t viewInv[4][4];
-		float32_t proj[4][4];
-		float32_t lightColour[4];
+		mat<4, 4, float32_t> lightMat[SHADOW_MAP_CASCADE_COUNT];
+		mat<4, 4, float32_t> viewInv;
+		mat<4, 4, float32_t> proj;
+		vec<4, float32_t> lightColour;
 		float32_t cascadeSplits[SHADOW_MAP_CASCADE_COUNT]; // currently implemented as a vec4
-		float32_t lightDir[4]; // only using first three components
-		float32_t cameraPosition[4]; // only using first three components
+		vec<4, float32_t> lightDir; // only using first three components
+		vec<4, float32_t> cameraPosition; // only using first three components
 		
 		static const int binding = 0;
 	};
 	
 	struct PerObject {
-		float32_t model[4][4];
-		float32_t modelInvT[4][4];
+		mat<4, 4, float32_t> model;
+		mat<4, 4, float32_t> modelInvT;
 	};
 	
 	static const int ubosN = 2;
@@ -216,9 +216,9 @@ struct Pipeline_Hud {
 	
 	struct Attributes {
 		struct Vertex {
-			float32_t position[2];
-			float32_t colour[4];
-			float32_t texCoord[2];
+			vec<2, float32_t> position;
+			vec<4, float32_t> colour;
+			vec<2, float32_t> texCoord;
 		};
 		
 		
@@ -259,7 +259,7 @@ struct Pipeline_ShadowOnce {
 };
 struct Shared_Shadow {
 	struct UBO_Global {
-		float32_t viewInvProj[SHADOW_MAP_CASCADE_COUNT][4][4];
+		mat<4, 4, float32_t> viewInvProj[SHADOW_MAP_CASCADE_COUNT];
 		
 		static const int binding = 0;
 	};
@@ -278,16 +278,16 @@ struct Pipeline_Skybox {
 	static const int ubosN = 1;
 	
 	struct UBO_Global {
-		float32_t viewInv[4][4];
-		float32_t proj[4][4];
-		float32_t cameraPosition[4]; // only using first three components
+		mat<4, 4, float32_t> viewInv;
+		mat<4, 4, float32_t> proj;
+		vec<4, float32_t> cameraPosition; // only using first three components
 		
 		static const int binding = 0;
 	};
 	
 	struct Attributes {
 		struct Vertex {
-			float32_t position[3];
+			vec<3, float32_t> position;
 		};
 		
 		static constexpr VkPipelineVertexInputStateCreateInfo stateCI = {
@@ -317,8 +317,8 @@ struct Pipeline_Final {
 	
 	struct Attributes {
 		struct Vertex {
-			float32_t position[2];
-			float32_t texCoord[2];
+			vec<2, float32_t> position;
+			vec<2, float32_t> texCoord;
 		};
 		
 		
@@ -406,7 +406,7 @@ struct Globals {
 	static constexpr int indexBuffersN = MainInstanced::indexedN + MainOnce::indexedN + HUD::indexedN + Skybox::indexedN + Finall::indexedN;											// total number of index buffers required (across all pipelines)
 	static constexpr int ubosN = Shared_Main::ubosN + Pipeline_Hud::ubosN + Shared_Shadow::ubosN + Pipeline_Skybox::ubosN + Pipeline_Histogram::ubosN;										// total number of uniform buffer objects required (across all pipelines)
 	
-	static constexpr vec3 lightDirection = {-0.700140042f, 0.1400280084f, -0.700140042f};
+	static constexpr vec<3> lightDirection = (vec<3>){-0.700140042f, 0.1400280084f, -0.700140042f};
 	static constexpr float cameraZNear = 0.1f;
 	static constexpr float cameraZFar = 1000.0f;
 	static constexpr float cascadeSplitLambda = 0.5f;
