@@ -18,10 +18,10 @@ public:
 
 class Once : public Parent {
 public:
-	Once(const int &_index, const ObjectData &_objData);
+	Once(int _index, const ObjectData &_objData);
 	~Once(){}
 	
-	virtual void Update(const float &dT, Shared_Main::PerObject *const &perObjectDataPtr){}
+	virtual void Update(float dT, Shared_Main::PerObject *perObjectDataPtr){}
 	void Render(const GraphicsPipeline &pipeline, Shared_Main::PushConstants_Vert *vertPcs, Shared_Main::PushConstants_Frag *fragPcs, Shared_Shadow::PushConstants_Vert *shadPcs) override;
 	
 private:
@@ -31,10 +31,10 @@ private:
 
 class Instance {
 public:
-	Instance(InstanceManager *const &_manager);
+	Instance(InstanceManager *_manager);
 	~Instance();
 	
-	virtual void Update(const float &dT, Shared_Main::PerObject *const &perObjectDataPtr){}
+	virtual void Update(float dT, Shared_Main::PerObject *perObjectDataPtr){}
 	
 private:
 	InstanceManager *manager;
@@ -42,16 +42,16 @@ private:
 
 class InstanceManager : public Parent {
 public:
-	InstanceManager(const int &_index, const ObjectData &_objData);
+	InstanceManager(int _index, const ObjectData &_objData);
 	~InstanceManager(){}
 	
-	void Update(const float &dT);
+	void Update(float dT);
 	void Render(const GraphicsPipeline &pipeline, Shared_Main::PushConstants_Vert *vertPcs, Shared_Main::PushConstants_Frag *fragPcs, Shared_Shadow::PushConstants_Vert *shadPcs) override;
 	
-	void AddInstance(Instance *const &ptr){
+	void AddInstance(Instance *ptr){
 		instances[instanceCount++] = ptr;
 	}
-	void RemoveInstance(Instance *const &ptr){
+	void RemoveInstance(Instance *ptr){
 		for(int i=0; i<instanceCount; i++){
 			if(instances[i] == ptr){
 				memcpy(&instances[i], &instances[i + 1], instanceCount - i - 1);

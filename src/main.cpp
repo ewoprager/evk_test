@@ -91,12 +91,10 @@ static const uint32_t skyboxIndices[skyboxIndicesN] = {
 
 EVK::Interface *vulkanPtr=nullptr;
 
-EVK::ImageBlueprint *imageBlueprintPtrs[Globals::texturesN];
-int imagesBlueprinted = 0;
+std::vector<std::shared_ptr<EVK::IImageBlueprint>> imageBlueprintPtrs {};
 
-#include <map>
 std::map<std::string, uint32_t> materialDictionary = {};
-int textureImageIndexArray[PNGS_N]; // a texture ID is the index in this array at which the texture image index (in the `Vulkan` devices.instance) is stored
+std::vector<int> textureImageIndexArray(PNGS_N); // a texture ID is the index in this array at which the texture image index (in the `Vulkan` devices.instance) is stored
 int textureImageIndexCount = 0;
 uint32_t GetTextureIdFromMtl(const char *usemtl){
 	if(materialDictionary.contains(std::string(usemtl))) return materialDictionary[std::string(usemtl)];
@@ -110,8 +108,8 @@ uint32_t GetTextureIdFromMtl(const char *usemtl){
 	memcpy(buffer, prefix, prefixLength*sizeof(char));
 	memcpy(buffer + prefixLength, usemtl, nameLength*sizeof(char));
 	memcpy(buffer + prefixLength + nameLength, suffix, suffixLength*sizeof(char));
-	imageBlueprintPtrs[imagesBlueprinted] = new EVK::PNGImageBlueprint(buffer);
-	const int imageIndex = imagesBlueprinted++;
+	const int imageIndex = imageBlueprintPtrs.size();
+	imageBlueprintPtrs.push_back(std::make_shared<EVK::PNGImageBlueprint>(buffer));
 	textureImageIndexArray[textureImageIndexCount] = imageIndex;
 	materialDictionary[std::string(usemtl)] = textureImageIndexCount;
 	return textureImageIndexCount++;
@@ -123,7 +121,7 @@ ObjectData objDatas[OBJ_DATAS_N];
 
 class Player : public Rendered::Once {
 public:
-	Player(const int &_index, const vec2 &_position) : Rendered::Once(_index, objDatas[(int)ObjData::player]/*ReadProcessedOBJFile("ProcessedObjFiles/MaleLow.bin", &GetTextureIdFromMtl)*/), position(_position | 50.0f) {
+	Player(int _index, const vec2 &_position) : Rendered::Once(_index, objDatas[(int)ObjData::player]/*ReadProcessedOBJFile("ProcessedObjFiles/MaleLow.bin", &GetTextureIdFromMtl)*/), position(_position | 50.0f) {
 		SDL_Event event;
 		event.type = SDL_MOUSEMOTION;
 		mmEID = ESDL::AddEventCallback((MemberFunction<Player, void, SDL_Event>){this, &Player::MouseMoved}, event);
@@ -134,7 +132,7 @@ public:
 		ESDL::RemoveEventCallback(mmEID);
 	}
 	
-	void Update(const float &dT, Shared_Main::PerObject *const &perObjectDataPtr) override {
+	void Update(float dT, Shared_Main::PerObject *perObjectDataPtr) override {
 		yaw = -yawSensitivity*(float)cursorX;
 		pitch = -pitchSensitivity*(float)cursorY;
 		if(pitch > 0.5f*M_PI) pitch = 0.5f*M_PI;
@@ -201,12 +199,12 @@ public:
 };
 class ChairInstance : public Rendered::Instance {
 public:
-	ChairInstance(ChairInstanceManager *const &_manager) : Rendered::Instance(_manager) {
+	ChairInstance(ChairInstanceManager *_manager) : Rendered::Instance(_manager) {
 		position = {0.0f, 0.0f};
 		angle = 0.0f;
 	}
 	
-	void Update(const float &dT, Shared_Main::PerObject *const &perObjectDataPtr) override {
+	void Update(float dT, Shared_Main::PerObject *perObjectDataPtr) override {
 		float a[4][4];
 		
 		M4x4_xRotation(M_PI*0.5f, perObjectDataPtr->model);
@@ -242,9 +240,9 @@ private:
 
 class ChainSaw : public Rendered::Once {
 public:
-	ChainSaw(const int &_index, ChairInstance *const &_chair) : Rendered::Once(_index, objDatas[(int)ObjData::chainsaw]/*ReadProcessedOBJFile("ProcessedObjFiles/chainsaw.bin", &GetTextureIdFromMtl)*/), chair(_chair) {}
+	ChainSaw(int _index, ChairInstance *_chair) : Rendered::Once(_index, objDatas[(int)ObjData::chainsaw]/*ReadProcessedOBJFile("ProcessedObjFiles/chainsaw.bin", &GetTextureIdFromMtl)*/), chair(_chair) {}
 	
-	void Update(const float &dT, Shared_Main::PerObject *const &perObjectDataPtr) override {
+	void Update(float dT, Shared_Main::PerObject *perObjectDataPtr) override {
 		memcpy(perObjectDataPtr, chair->GetInstanceData(), sizeof(Shared_Main::PerObject));
 		float a[4][4];
 		M4x4_Translation({-5.0f, 27.0f, 0.0f}, a);
@@ -270,11 +268,11 @@ private:
 
 class Plane : public Rendered::Once {
 public:
-	Plane(const int &_index) : Rendered::Once(_index, objDatas[(int)ObjData::plane]/*planeData*/) {
+	Plane(int _index) : Rendered::Once(_index, objDatas[(int)ObjData::plane]/*planeData*/) {
 		
 	}
 	
-	void Update(const float &dT, Shared_Main::PerObject *const &perObjectData) override {
+	void Update(float dT, Shared_Main::PerObject *perObjectData) override {
 		M4x4_Identity(perObjectData->model);
 		M4x4_Identity(perObjectData->modelInvT);
 	}
@@ -289,12 +287,11 @@ Rendered::InstanceManager *renderedInstanced[Globals::MainInstanced::renderedN];
 Rendered::Once *renderedOnce[Globals::MainOnce::renderedN];
 Player *player;
 
-void Update(const float &dT, Shared_Main::PushConstants_Vert &vertPcs, Shared_Main::PushConstants_Frag &fragPcs, Shared_Shadow::PushConstants_Vert &shadPcs){
+void Update(float dT, Shared_Main::PushConstants_Vert &vertPcs, Shared_Main::PushConstants_Frag &fragPcs, Shared_Shadow::PushConstants_Vert &shadPcs){
 	
 	// UBOs
 	Shared_Main::UBO_Global *const uboGlobalPointer = vulkanPtr->GetUniformBufferObjectPointer<Shared_Main::UBO_Global>((int)UBO::mainGlobal/*sharedMainGlobalUboIndex*/);
-	static Shared_Main::PerObject *uboPerObjectPointers[Globals::MainOnce::renderedN];
-	vulkanPtr->GetUniformBufferObjectPointers<Shared_Main::PerObject>((int)UBO::mainPerObject/*mainOncePerObjectUboIndex*/, uboPerObjectPointers);
+	std::vector<Shared_Main::PerObject *> uboPerObjectPointers = vulkanPtr->GetUniformBufferObjectPointers<Shared_Main::PerObject>((int)UBO::mainPerObject/*mainOncePerObjectUboIndex*/);
 	Shared_Shadow::UBO_Global *const uboShadowPointer = vulkanPtr->GetUniformBufferObjectPointer<Shared_Shadow::UBO_Global>((int)UBO::shadow/*sharedShadowGlobalUboIndex*/);
 	Pipeline_Skybox::UBO_Global *const uboSkyboxPointer = vulkanPtr->GetUniformBufferObjectPointer<Pipeline_Skybox::UBO_Global>((int)UBO::skybox/*skyboxGlobalUboIndex*/);
 	Pipeline_Hud::UBO *const uboHudPointer = vulkanPtr->GetUniformBufferObjectPointer<Pipeline_Hud::UBO>((int)UBO::hud/*hudUboIndex*/);
@@ -346,10 +343,10 @@ void RenderShadowMap(Shared_Shadow::PushConstants_Vert shadPcs, const int &casca
 	
 	vulkanPtr->GP((int)GraphicsPipeline::shadowOnce).Bind();
 	vulkanPtr->GP((int)GraphicsPipeline::shadowOnce).CmdPushConstants<Shared_Shadow::PushConstants_Vert>(0, &shadPcs);
-	int indices[Pipeline_MainOnce::dynamicOffsetsN];
+	std::vector<int> indices(Pipeline_MainOnce::dynamicOffsetsN);
 	for(int i=0; i<Globals::MainOnce::renderedN; i++){
 		indices[0] = i;
-		vulkanPtr->GP((int)GraphicsPipeline::shadowOnce).BindDescriptorSets(0, Pipeline_ShadowOnce::descriptorSetsN, Pipeline_MainOnce::dynamicOffsetsN, indices);
+		vulkanPtr->GP((int)GraphicsPipeline::shadowOnce).BindDescriptorSets(0, Pipeline_ShadowOnce::descriptorSetsN, indices);
 		renderedOnce[i]->Render(GraphicsPipeline::shadowOnce, nullptr, nullptr, &shadPcs);
 	}
 }
@@ -360,10 +357,10 @@ void RenderScene(Shared_Main::PushConstants_Vert vertPcs, Shared_Main::PushConst
 	for(int i=0; i<Globals::MainInstanced::renderedN; i++) renderedInstanced[i]->Render(GraphicsPipeline::mainInstanced, &vertPcs, &fragPcs, nullptr);
 	
 	vulkanPtr->GP((int)GraphicsPipeline::mainOnce).Bind();
-	int indices[Pipeline_MainOnce::dynamicOffsetsN];
+	std::vector<int> indices(Pipeline_MainOnce::dynamicOffsetsN);
 	for(int i=0; i<Globals::MainOnce::renderedN; i++){
 		indices[0] = i;
-		vulkanPtr->GP((int)GraphicsPipeline::mainOnce).BindDescriptorSets(0, Pipeline_MainOnce::descriptorSetsN, Pipeline_MainOnce::dynamicOffsetsN, indices);
+		vulkanPtr->GP((int)GraphicsPipeline::mainOnce).BindDescriptorSets(0, Pipeline_MainOnce::descriptorSetsN, indices);
 		renderedOnce[i]->Render(GraphicsPipeline::mainOnce, &vertPcs, &fragPcs, nullptr);
 	}
 }
@@ -391,66 +388,71 @@ int main(int argc, const char * argv[]) {
 	
 	int skyboxImageIndex;
 	{ // preparing skybox
-		const char *cubemapFiles[6] = {
+		std::array<std::string, 6> cubemapFiles = {{
 			"../Resources/textures/skybox_b.png", // correct
 			"../Resources/textures/skybox_e.png", // correct
 			"../Resources/textures/skybox_d.png", // correct
 			"../Resources/textures/skybox_f.png", // correct
 			"../Resources/textures/skybox_a.png", // correct
 			"../Resources/textures/skybox_c.png" // correct
-		};
-		imageBlueprintPtrs[imagesBlueprinted] = new EVK::CubemapPNGImageBlueprint(cubemapFiles);
-		skyboxImageIndex = imagesBlueprinted++;
+		}};
+		skyboxImageIndex = imageBlueprintPtrs.size();
+		imageBlueprintPtrs.push_back(std::make_shared<EVK::CubemapPNGImageBlueprint>(cubemapFiles));
 	}
 	
 	int shadowImageIndex;
 	{
 		// For shadow mapping we only need a depth attachment
-		VkImageCreateInfo imageCI = {};
-		imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		imageCI.imageType = VK_IMAGE_TYPE_2D;
-		imageCI.extent.width = SHADOWMAP_DIM;
-		imageCI.extent.height = SHADOWMAP_DIM;
-		imageCI.extent.depth = 1;
-		imageCI.mipLevels = 1;
-		imageCI.arrayLayers = SHADOW_MAP_CASCADE_COUNT;
-		imageCI.format = DEPTH_FORMAT;
-		imageCI.tiling = VK_IMAGE_TILING_OPTIMAL; // VK_IMAGE_TILING_LINEAR for row-major order if we want to access texels in the memory of the image
-		imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
-		imageCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		imageBlueprintPtrs[imagesBlueprinted] = new EVK::ManualImageBlueprint(imageCI, VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
-		shadowImageIndex = imagesBlueprinted++;
+		VkImageCreateInfo imageCI = {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+			.imageType = VK_IMAGE_TYPE_2D,
+			.extent = {
+				.width = SHADOWMAP_DIM,
+				.height = SHADOWMAP_DIM,
+				.depth = 1
+			},
+			.mipLevels = 1,
+			.arrayLayers = SHADOW_MAP_CASCADE_COUNT,
+			.format = DEPTH_FORMAT,
+			.tiling = VK_IMAGE_TILING_OPTIMAL, // VK_IMAGE_TILING_LINEAR for row-major order if we want to access texels in the memory of the image
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.sharingMode = VK_SHARING_MODE_EXCLUSIVE
+		};
+		shadowImageIndex = imageBlueprintPtrs.size();
+		imageBlueprintPtrs.push_back(std::make_shared<EVK::ManualImageBlueprint>(imageCI, VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT));
 	}
 	
 	int finalColourImageIndex, finalDepthImageIndex;
 	{
-		VkImageCreateInfo imageCI = {};
-		imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		imageCI.imageType = VK_IMAGE_TYPE_2D;
-		imageCI.extent.width = 0; // resises with window
-		imageCI.extent.depth = 1;
-		imageCI.mipLevels = 1;
-		imageCI.arrayLayers = 1;
-		imageCI.format = FINAL_FORMAT;
-		imageCI.tiling = VK_IMAGE_TILING_OPTIMAL; // VK_IMAGE_TILING_LINEAR for row-major order if we want to access texels in the memory of the image
-		imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		imageCI.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+		VkImageCreateInfo imageCI = {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+			.imageType = VK_IMAGE_TYPE_2D,
+			.extent = {
+				.width = 0, // resises with window
+				.depth = 1
+			},
+			.mipLevels = 1,
+			.arrayLayers = 1,
+			.format = FINAL_FORMAT,
+			.tiling = VK_IMAGE_TILING_OPTIMAL, // VK_IMAGE_TILING_LINEAR for row-major order if we want to access texels in the memory of the image
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
 #ifdef MSAA
-		imageCI.samples = devices.GetMSAASamples();
+			.samples = devices.GetMSAASamples(),
 #else
-		imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
+			.samples = VK_SAMPLE_COUNT_1_BIT,
 #endif
-		imageCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		imageBlueprintPtrs[imagesBlueprinted] = new EVK::ManualImageBlueprint(imageCI, VK_IMAGE_VIEW_TYPE_2D, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
-		finalColourImageIndex = imagesBlueprinted++;
-		
+			.sharingMode = VK_SHARING_MODE_EXCLUSIVE
+		};
+		finalColourImageIndex = imageBlueprintPtrs.size();
+		imageBlueprintPtrs.push_back(std::make_shared<EVK::ManualImageBlueprint>(imageCI, VK_IMAGE_VIEW_TYPE_2D, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_COLOR_BIT));
 		
 		imageCI.format = devices.FindDepthFormat();
 		imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		imageBlueprintPtrs[imagesBlueprinted] = new EVK::ManualImageBlueprint(imageCI, VK_IMAGE_VIEW_TYPE_2D, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
-		finalDepthImageIndex = imagesBlueprinted++;
+		finalDepthImageIndex = imageBlueprintPtrs.size();
+		imageBlueprintPtrs.push_back(std::make_shared<EVK::ManualImageBlueprint>(imageCI, VK_IMAGE_VIEW_TYPE_2D, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT));
 	}
 	
 	objDatas[(int)ObjData::player] = ReadProcessedOBJFile("../Resources/ProcessedObjFiles/MaleLow.bin", &GetTextureIdFromMtl);
@@ -496,15 +498,20 @@ int main(int argc, const char * argv[]) {
 		Shared_Main::PushConstants_Frag fragPcs;
 		Shared_Shadow::PushConstants_Vert shadPcs;
 		
-		VkClearValue clearVals[2];
-		clearVals[0].color = {{1.0f, 1.0f, 1.0f, 1.0f}};
-		clearVals[1].depthStencil = {1.0f, 0};
+		std::vector<VkClearValue> clearVals = {
+			{
+				.color = {{1.0f, 1.0f, 1.0f, 1.0f}}
+			},
+			{
+				.depthStencil = {1.0f, 0}
+			}
+		};
 		
 		Update(dT, vertPcs, fragPcs, shadPcs);
 		
 		if(vulkan.BeginFrame()){
 			for(int i=0; i<SHADOW_MAP_CASCADE_COUNT; i++){
-				vulkan.CmdBeginLayeredBufferedRenderPass(0, VK_SUBPASS_CONTENTS_INLINE, 1, &clearVals[1], i);
+				vulkan.CmdBeginLayeredBufferedRenderPass(0, VK_SUBPASS_CONTENTS_INLINE, {clearVals[1]}, i);
 				//vulkan.CmdSetDepthBias(1.25f, 0.0f, 1.75f); // 1.25, 0.0, 1.75
 				RenderShadowMap(shadPcs, i);
 				vulkan.CmdEndRenderPass();
@@ -524,7 +531,7 @@ int main(int argc, const char * argv[]) {
 			RenderHUD();
 			 */
 			
-			vulkan.CmdBeginBufferedRenderPass(0, VK_SUBPASS_CONTENTS_INLINE, 2, clearVals);
+			vulkan.CmdBeginBufferedRenderPass(0, VK_SUBPASS_CONTENTS_INLINE, clearVals);
 			
 			vulkan.GP((int)GraphicsPipeline::skybox).Bind();
 			vulkan.GP((int)GraphicsPipeline::skybox).BindDescriptorSets(0, Pipeline_Skybox::descriptorSetsN);

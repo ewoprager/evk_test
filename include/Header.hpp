@@ -1,16 +1,16 @@
 #ifndef Header_hpp
 #define Header_hpp
 
-#include <evk/Base.hpp>
+#include <map>
+#include <sys/time.h>
 
+#include <mat4x4/vec2.hpp>
 #include <ESDL/ESDL_General.hpp>
 #include <ESDL/ESDL_EventHandler.hpp>
+#include <evk/Base.hpp>
 
 #include <ReadProcessedObj.hpp>
 
-#include <mat4x4/vec2.hpp>
-
-#include <sys/time.h>
 
 #define GRAPHICS_PIPELINES_N 7
 enum class GraphicsPipeline {mainInstanced, mainOnce, hud, shadowInstanced, shadowOnce, skybox, finall};
@@ -405,8 +405,6 @@ struct Globals {
 	static constexpr int vertexBuffersN = 2*MainInstanced::renderedN + + MainOnce::renderedN + HUD::renderedN + Skybox::renderedN + Finall::renderedN;	// total number of vertex buffers required (for both per-vertex and per-devices.instance data, across all pipelines)
 	static constexpr int indexBuffersN = MainInstanced::indexedN + MainOnce::indexedN + HUD::indexedN + Skybox::indexedN + Finall::indexedN;											// total number of index buffers required (across all pipelines)
 	static constexpr int ubosN = Shared_Main::ubosN + Pipeline_Hud::ubosN + Shared_Shadow::ubosN + Pipeline_Skybox::ubosN + Pipeline_Histogram::ubosN;										// total number of uniform buffer objects required (across all pipelines)
-	
-	static constexpr int texturesN = PNGS_N + SHADOW_MAPS_N + FINAL_IMAGES_N + SKY_BOXES_N;
 	
 	static constexpr vec3 lightDirection = {-0.700140042f, 0.1400280084f, -0.700140042f};
 	static constexpr float cameraZNear = 0.1f;

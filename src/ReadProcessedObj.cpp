@@ -31,7 +31,7 @@ obj_vn VectorToOBJVN(vec3 vec){
 }
 
 // allocates both the `vertices` and `divisionData` arrays in the returned struct (so they need to be freed eventually)
-ObjectData ReadProcessedOBJFile(const char *const &file, uint32_t (*mtlNameToTextureId)(const char *)){
+ObjectData ReadProcessedOBJFile(const char *file, uint32_t (*mtlNameToTextureId)(const char *)){
 	ObjectData ret;
 	
 	FILE *fptr;

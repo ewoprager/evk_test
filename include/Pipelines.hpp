@@ -3,6 +3,6 @@
 
 #include "Header.hpp"
 
-EVK::Interface NewBuildPipelines(const EVK::Devices &devices, EVK::ImageBlueprint **const &imageBlueprintPtrs, int shadowMapImageIndex, int skyboxImageIndex, int finalColourImageIndex, int finalDepthImageIndex);
+EVK::Interface NewBuildPipelines(const EVK::Devices &devices, const std::vector<std::shared_ptr<EVK::IImageBlueprint>> &imageBlueprintPtrs, int shadowMapImageIndex, int skyboxImageIndex, int finalColourImageIndex, int finalDepthImageIndex);
 
 #endif /* Pipelines_hpp */

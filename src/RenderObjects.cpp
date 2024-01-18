@@ -5,7 +5,7 @@ extern EVK::Interface *vulkanPtr;
 
 namespace Rendered {
 
-Once::Once(const int &_index, const ObjectData &_objData) : index(_index), objData(_objData) {
+Once::Once(int _index, const ObjectData &_objData) : index(_index), objData(_objData) {
 	vulkanPtr->FillVertexBuffer(Globals::MainOnce::vertexVBIndexOffset + _index, (void *)_objData.vertices, _objData.vertices_n*sizeof(Pipeline_MainOnce::Attributes::Vertex));
 }
 void Once::Render(const GraphicsPipeline &pipeline, Shared_Main::PushConstants_Vert *vertPcs, Shared_Main::PushConstants_Frag *fragPcs, Shared_Shadow::PushConstants_Vert *shadPcs){
@@ -22,10 +22,10 @@ void Once::Render(const GraphicsPipeline &pipeline, Shared_Main::PushConstants_V
 	}
 }
 
-InstanceManager::InstanceManager(const int &_index, const ObjectData &_objData) : index(_index), objData(_objData) {
+InstanceManager::InstanceManager(int _index, const ObjectData &_objData) : index(_index), objData(_objData) {
 	vulkanPtr->FillVertexBuffer(Globals::MainInstanced::vertexVBIndexOffset + _index, (void *)_objData.vertices, _objData.vertices_n*sizeof(Pipeline_MainInstanced::Attributes::Vertex));
 }
-void InstanceManager::Update(const float &dT){
+void InstanceManager::Update(float dT){
 	for(int i=0; i<instanceCount; i++) instances[i]->Update(dT, &instanceData[i]);
 	vulkanPtr->FillVertexBuffer(Globals::MainInstanced::vertexVBIndexOffset + Globals::MainInstanced::renderedN + index, (void *)instanceData, instanceCount*sizeof(Shared_Main::PerObject));
 }
@@ -44,7 +44,7 @@ void InstanceManager::Render(const GraphicsPipeline &pipeline, Shared_Main::Push
 	}
 }
 
-Instance::Instance(InstanceManager *const &_manager) : manager(_manager) {
+Instance::Instance(InstanceManager *_manager) : manager(_manager) {
 	_manager->AddInstance(this);
 }
 Instance::~Instance(){

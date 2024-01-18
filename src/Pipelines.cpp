@@ -1,8 +1,8 @@
 #include "Pipelines.hpp"
 
-extern int textureImageIndexArray[PNGS_N];
+extern std::vector<int> textureImageIndexArray;
 
-EVK::Interface NewBuildPipelines(const EVK::Devices &devices, EVK::ImageBlueprint **const &imageBlueprintPtrs, int shadowMapImageIndex, int skyboxImageIndex, int finalColourImageIndex, int finalDepthImageIndex){
+EVK::Interface NewBuildPipelines(const EVK::Devices &devices, const std::vector<std::shared_ptr<EVK::IImageBlueprint>> &imageBlueprintPtrs, int shadowMapImageIndex, int skyboxImageIndex, int finalColourImageIndex, int finalDepthImageIndex){
 	
 	VkPipelineRasterizationStateCreateInfo rasterizer{};
 	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -100,44 +100,46 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, EVK::ImageBlueprin
 	//dynamicState.dynamicStateCount = 2;
 	dynamicState.pDynamicStates = dynamicStates;
 	
-	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	VkPipelineVertexInputStateCreateInfo vertexInputInfo{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
+	};
 	
-	VkPipelineShaderStageCreateInfo shaderStages[2];
-	// vertex shader
-	shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-	shaderStages[0].pName = "main";
-	//shaderStages[0].module = ...;
-	// this is for constants to use in the shader:
-	shaderStages[0].pSpecializationInfo = nullptr;
-	// fragment shader
-	shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	shaderStages[1].pName = "main";
-	//shaderStages[1].module = ...;
-	// this is for constants to use in the shader:
-	shaderStages[1].pSpecializationInfo = nullptr;
-	
-	
-	
-	const int mainPushConstantRangesN = 2;
-	VkPushConstantRange mainPushConstantRanges[mainPushConstantRangesN] = {
-		{
-			VK_SHADER_STAGE_VERTEX_BIT,				// shader stage
-			0,										// offset
-			sizeof(Shared_Main::PushConstants_Vert)	// size
+	std::vector<VkPipelineShaderStageCreateInfo> shaderStages = {
+		{// vertex shader
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_VERTEX_BIT,
+			.pName = "main",
+			//.module = ...,
+			// this is for constants to use in the shader:
+			.pSpecializationInfo = nullptr
 		},
-		{
-			VK_SHADER_STAGE_FRAGMENT_BIT,
-			sizeof(Shared_Main::PushConstants_Vert),
-			sizeof(Shared_Main::PushConstants_Frag)
+		{// fragment shader
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.pName = "main",
+			//.module = ...,
+			// this is for constants to use in the shader:
+			.pSpecializationInfo = nullptr
+		}
+	};
+	
+	
+	std::vector<VkPushConstantRange> mainPushConstantRanges = {
+		(VkPushConstantRange){
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+			.offset = 0,
+			.size = sizeof(Shared_Main::PushConstants_Vert)
+		},
+		(VkPushConstantRange){
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.offset = sizeof(Shared_Main::PushConstants_Vert),
+			.size = sizeof(Shared_Main::PushConstants_Frag)
 		}
 	};
 	VkPushConstantRange shadowPushConstantRange = {
-		VK_SHADER_STAGE_VERTEX_BIT,
-		0,
-		sizeof(Shared_Shadow::PushConstants_Vert)
+		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		.offset = 0,
+		.size = sizeof(Shared_Shadow::PushConstants_Vert)
 	};
 	
 	//int textureImageIndexArray[PNGS_N]; for(int i=0; i<PNGS_N; i++) textureImageIndexArray[i] = i + SHADOW_MAPS_N + SKY_BOXES_N;
@@ -153,325 +155,309 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, EVK::ImageBlueprin
 	int histogramUboIndex = (int)UBO::histogram;
 	int histogramSboIndex = (int)SBO::histogram;
 	
-	EVK::DescriptorBlueprint mainDescriptorSet0DescriptorBlueprints[4] = {
-		{
-			EVK::DescriptorType::UBO,										// type
-			Shared_Main::UBO_Global::binding,							// binding
-			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,	// shader stage(s)
-			1,															// count
-			&uboMainGlobalIndex											// indices
+	EVK::DescriptorSetBlueprint mainDescriptorSetBlueprint = {
+		(EVK::DescriptorBlueprint){
+			.type = EVK::DescriptorType::UBO,
+			.binding = Shared_Main::UBO_Global::binding,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+			.indicesExtra = {uboMainGlobalIndex}
 		},
-		{
-			EVK::DescriptorType::textureImage,
-			Shared_Main::textureImagesBinding,
-			VK_SHADER_STAGE_FRAGMENT_BIT,
-			PNGS_N,
-			textureImageIndexArray
+		(EVK::DescriptorBlueprint){
+			.type = EVK::DescriptorType::textureImage,
+			.binding = Shared_Main::textureImagesBinding,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.indicesExtra = textureImageIndexArray
 		},
-		{
-			EVK::DescriptorType::textureSampler,
-			Shared_Main::textureSamplerBinding,
-			VK_SHADER_STAGE_FRAGMENT_BIT,
-			1,
-			&samplerMainIndex
+		(EVK::DescriptorBlueprint){
+			.type = EVK::DescriptorType::textureSampler,
+			.binding = Shared_Main::textureSamplerBinding,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.indicesExtra = {samplerMainIndex}
 		},
-		{
-			EVK::DescriptorType::combinedImageSampler,
-			Shared_Main::shadowMapBinding,
-			VK_SHADER_STAGE_FRAGMENT_BIT,
-			1,
-			&shadowMapImageIndex,
-			&samplerShadowIndex
+		(EVK::DescriptorBlueprint){
+			.type = EVK::DescriptorType::combinedImageSampler,
+			.binding = Shared_Main::shadowMapBinding,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.indicesExtra = {shadowMapImageIndex},
+			.indicesExtra2 = {samplerShadowIndex}
 		}
 	};
-	EVK::DescriptorSetBlueprint mainDescriptorSet0Build = {4, mainDescriptorSet0DescriptorBlueprints};
-	EVK::DescriptorBlueprint shadowDescriptorSetDescriptorBuild[1] = {
-		{
-			EVK::DescriptorType::UBO,
-			Shared_Shadow::UBO_Global::binding,
-			VK_SHADER_STAGE_VERTEX_BIT,
-			1,
-			&uboShadowIndex
+	EVK::DescriptorSetBlueprint shadowDescriptorSetBlueprint = {
+		(EVK::DescriptorBlueprint){
+			.type = EVK::DescriptorType::UBO,
+			.binding = Shared_Shadow::UBO_Global::binding,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+			.indicesExtra = {uboShadowIndex}
 		}
 	};
-	EVK::DescriptorSetBlueprint shadowDescriptorSet0Build = {1, shadowDescriptorSetDescriptorBuild};
-	EVK::DescriptorBlueprint onceDescriptorSetDescriptorBlueprints = {
-		EVK::DescriptorType::UBO,
-		Pipeline_MainOnce::perObjectUboBinding,
-		VK_SHADER_STAGE_VERTEX_BIT,
-		1,
-		&uboMainPerObjectIndex
+	
+	std::vector<EVK::DescriptorBlueprint> onceDescriptorSetBlueprint = {
+		(EVK::DescriptorBlueprint){
+			.type = EVK::DescriptorType::UBO,
+			.binding = Pipeline_MainOnce::perObjectUboBinding,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+			.indicesExtra = {uboMainPerObjectIndex}
+		}
 	};
 	
 	// main instanced
-	EVK::GraphicsPipelineBlueprint pbMainInstanced = {};
-	pbMainInstanced.pipelineBlueprint.descriptorSetsN = 1;
-	EVK::DescriptorSetBlueprint mainInstancedDescriptorSetBlueprints[1] = {mainDescriptorSet0Build};
-	pbMainInstanced.pipelineBlueprint.descriptorSetBlueprints = mainInstancedDescriptorSetBlueprints;
-	pbMainInstanced.pipelineBlueprint.pushConstantRangesN = mainPushConstantRangesN;
-	pbMainInstanced.pipelineBlueprint.pushConstantRanges = mainPushConstantRanges;
-	pbMainInstanced.stageCount = 2;
-	VkPipelineShaderStageCreateInfo mainInstancedShaderStages[2];
-	memcpy(mainInstancedShaderStages, shaderStages, 2*sizeof(VkPipelineShaderStageCreateInfo));
+	std::vector<VkPipelineShaderStageCreateInfo> mainInstancedShaderStages = shaderStages;
 	mainInstancedShaderStages[0].module = devices.CreateShaderModule("../Resources/Shaders/vertMainInstanced.spv");
 	mainInstancedShaderStages[1].module = devices.CreateShaderModule("../Resources/Shaders/fragMain.spv");
-	pbMainInstanced.shaderStageCIs = mainInstancedShaderStages;
 	vertexInputInfo = Pipeline_MainInstanced::Attributes::stateCI;
-	pbMainInstanced.vertexInputStateCI = vertexInputInfo;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
 	rasterizer.depthBiasEnable = VK_FALSE;
-	pbMainInstanced.rasterisationStateCI = rasterizer;
-#ifdef MSAA
-	multisampling.rasterizationSamples = devices.GetMSAASamples();
-#else
-	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-#endif
-	pbMainInstanced.multisampleStateCI = multisampling;
 	colourBlending.attachmentCount = 1;
-	pbMainInstanced.colourBlendStateCI = colourBlending;
 	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
-	pbMainInstanced.depthStencilStateCI = depthStencil;
 	dynamicState.dynamicStateCount = 2;
-	pbMainInstanced.dynamicStateCI = dynamicState;
-	pbMainInstanced.bufferedRenderPassIndex = (int)BRP::finall;
-	pbMainInstanced.layeredBufferedRenderPassIndex = -1;
+#ifdef MSAA
+		multisampling.rasterizationSamples = devices.GetMSAASamples();
+#else
+		multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+#endif
+	EVK::GraphicsPipelineBlueprint pbMainInstanced = {
+		.pipelineBlueprint = {
+			.descriptorSetBlueprints = {mainDescriptorSetBlueprint},
+			.pushConstantRanges = mainPushConstantRanges
+		},
+		.shaderStageCIs = mainInstancedShaderStages,
+		.vertexInputStateCI = vertexInputInfo,
+		.rasterisationStateCI = rasterizer,
+		.multisampleStateCI = multisampling,
+		.colourBlendStateCI = colourBlending,
+		.depthStencilStateCI = depthStencil,
+		.dynamicStateCI = dynamicState,
+		.bufferedRenderPassIndex = {(int)BRP::finall},
+		.layeredBufferedRenderPassIndex = {}
+	};
 	
 	// shadow instanced
-	EVK::GraphicsPipelineBlueprint pbShadowInstanced = {};
-	pbShadowInstanced.pipelineBlueprint.descriptorSetsN = 1;
-	EVK::DescriptorSetBlueprint shadowInstancedDescriptorSetBlueprints[1] = {shadowDescriptorSet0Build};
-	pbShadowInstanced.pipelineBlueprint.descriptorSetBlueprints = shadowInstancedDescriptorSetBlueprints;
-	pbShadowInstanced.pipelineBlueprint.pushConstantRangesN = 1;
-	pbShadowInstanced.pipelineBlueprint.pushConstantRanges = &shadowPushConstantRange;
-	pbShadowInstanced.stageCount = 1;
 	VkPipelineShaderStageCreateInfo shadowInstancedShaderStage = shaderStages[0];
 	shadowInstancedShaderStage.module = devices.CreateShaderModule("../Resources/Shaders/vertShadowInstanced.spv");
-	pbShadowInstanced.shaderStageCIs = &shadowInstancedShaderStage;
-	pbShadowInstanced.vertexInputStateCI = vertexInputInfo; // same as mainInstanced
 	rasterizer.cullMode = VK_CULL_MODE_NONE;
 	rasterizer.depthBiasEnable = VK_TRUE;
-	pbShadowInstanced.rasterisationStateCI = rasterizer;
 	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-	pbShadowInstanced.multisampleStateCI = multisampling;
 	colourBlending.attachmentCount = 0;
-	pbShadowInstanced.colourBlendStateCI = colourBlending;
 	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-	pbShadowInstanced.depthStencilStateCI = depthStencil;
 	dynamicState.dynamicStateCount = 3;
-	pbShadowInstanced.dynamicStateCI = dynamicState;
-	pbShadowInstanced.bufferedRenderPassIndex = -1;
-	pbShadowInstanced.layeredBufferedRenderPassIndex = (int)LBRP::shadow;
+	EVK::GraphicsPipelineBlueprint pbShadowInstanced = {
+		.pipelineBlueprint = {
+			.descriptorSetBlueprints = {shadowDescriptorSetBlueprint},
+			.pushConstantRanges = {shadowPushConstantRange}
+		},
+		.shaderStageCIs = {shadowInstancedShaderStage},
+		.vertexInputStateCI = vertexInputInfo, // same as mainInstanced
+		.rasterisationStateCI = rasterizer,
+		.multisampleStateCI = multisampling,
+		.colourBlendStateCI = colourBlending,
+		.depthStencilStateCI = depthStencil,
+		.dynamicStateCI = dynamicState,
+		.bufferedRenderPassIndex = {},
+		.layeredBufferedRenderPassIndex = {(int)LBRP::shadow}
+	};
 	
 	
 	// main once
-	EVK::GraphicsPipelineBlueprint pbMainOnce = {};
-	pbMainOnce.pipelineBlueprint.descriptorSetsN = 2;
-	EVK::DescriptorSetBlueprint mainOnceDescriptorSetBlueprints[2];
-	mainOnceDescriptorSetBlueprints[0] = mainDescriptorSet0Build;
-	mainOnceDescriptorSetBlueprints[1] = {1, &onceDescriptorSetDescriptorBlueprints};
-	pbMainOnce.pipelineBlueprint.descriptorSetBlueprints = mainOnceDescriptorSetBlueprints;
-	pbMainOnce.pipelineBlueprint.pushConstantRangesN = mainPushConstantRangesN;
-	pbMainOnce.pipelineBlueprint.pushConstantRanges = mainPushConstantRanges;
-	pbMainOnce.stageCount = 2;
-	VkPipelineShaderStageCreateInfo mainOnceShaderStages[2];
-	memcpy(mainOnceShaderStages, shaderStages, 2*sizeof(VkPipelineShaderStageCreateInfo));
+	std::vector<VkPipelineShaderStageCreateInfo> mainOnceShaderStages = shaderStages;
 	mainOnceShaderStages[0].module = devices.CreateShaderModule("../Resources/Shaders/vertMainOnce.spv");
 	mainOnceShaderStages[1].module = devices.CreateShaderModule("../Resources/Shaders/fragMain.spv");
-	pbMainOnce.shaderStageCIs = mainOnceShaderStages;
 	vertexInputInfo = Pipeline_MainOnce::Attributes::stateCI;
-	pbMainOnce.vertexInputStateCI = vertexInputInfo;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
 	rasterizer.depthBiasEnable = VK_FALSE;
-	pbMainOnce.rasterisationStateCI = rasterizer;
 #ifdef MSAA
 	multisampling.rasterizationSamples = devices.GetMSAASamples();
 #else
 	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 #endif
-	pbMainOnce.multisampleStateCI = multisampling;
 	colourBlending.attachmentCount = 1;
-	pbMainOnce.colourBlendStateCI = colourBlending;
 	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
-	pbMainOnce.depthStencilStateCI = depthStencil;
 	dynamicState.dynamicStateCount = 2;
-	pbMainOnce.dynamicStateCI = dynamicState;
-	pbMainOnce.bufferedRenderPassIndex = (int)BRP::finall;
-	pbMainOnce.layeredBufferedRenderPassIndex = -1;
+	EVK::GraphicsPipelineBlueprint pbMainOnce = {
+		.pipelineBlueprint = {
+			.descriptorSetBlueprints = {
+				mainDescriptorSetBlueprint,
+				onceDescriptorSetBlueprint
+			},
+			.pushConstantRanges = mainPushConstantRanges
+		},
+		.shaderStageCIs = mainOnceShaderStages,
+		.vertexInputStateCI = vertexInputInfo,
+		.rasterisationStateCI = rasterizer,
+		.multisampleStateCI = multisampling,
+		.colourBlendStateCI = colourBlending,
+		.depthStencilStateCI = depthStencil,
+		.dynamicStateCI = dynamicState,
+		.bufferedRenderPassIndex = {(int)BRP::finall},
+		.layeredBufferedRenderPassIndex = {}
+	};
 	
 	// shadow once
-	EVK::GraphicsPipelineBlueprint pbShadowOnce = {};
-	pbShadowOnce.pipelineBlueprint.descriptorSetsN = 2;
-	EVK::DescriptorSetBlueprint shadowOnceDescriptorSetBlueprints[2];
-	shadowOnceDescriptorSetBlueprints[0] = shadowDescriptorSet0Build;
-	shadowOnceDescriptorSetBlueprints[1] = {1, &onceDescriptorSetDescriptorBlueprints};
-	pbShadowOnce.pipelineBlueprint.descriptorSetBlueprints = shadowOnceDescriptorSetBlueprints;
-	pbShadowOnce.pipelineBlueprint.pushConstantRangesN = 1;
-	pbShadowOnce.pipelineBlueprint.pushConstantRanges = &shadowPushConstantRange;
-	pbShadowOnce.stageCount = 1;
 	VkPipelineShaderStageCreateInfo shadowOnceShaderStage = shaderStages[0];
 	shadowOnceShaderStage.module = devices.CreateShaderModule("../Resources/Shaders/vertShadowOnce.spv");
-	pbShadowOnce.shaderStageCIs = &shadowOnceShaderStage;
-	pbShadowOnce.vertexInputStateCI = vertexInputInfo; // same as mainOnce
 	rasterizer.cullMode = VK_CULL_MODE_NONE;
 	rasterizer.depthBiasEnable = VK_TRUE;
-	pbShadowOnce.rasterisationStateCI = rasterizer;
 	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-	pbShadowOnce.multisampleStateCI = multisampling;
 	colourBlending.attachmentCount = 0;
-	pbShadowOnce.colourBlendStateCI = colourBlending;
 	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-	pbShadowOnce.depthStencilStateCI = depthStencil;
 	dynamicState.dynamicStateCount = 3;
-	pbShadowOnce.dynamicStateCI = dynamicState;
-	pbShadowOnce.bufferedRenderPassIndex = -1;
-	pbShadowOnce.layeredBufferedRenderPassIndex = (int)LBRP::shadow;
+	EVK::GraphicsPipelineBlueprint pbShadowOnce = {
+		.pipelineBlueprint = {
+			.descriptorSetBlueprints = {
+				shadowDescriptorSetBlueprint,
+				onceDescriptorSetBlueprint
+			},
+			.pushConstantRanges = {shadowPushConstantRange}
+		},
+		.shaderStageCIs = {shadowOnceShaderStage},
+		.vertexInputStateCI = vertexInputInfo, // same as mainOnce
+		.rasterisationStateCI = rasterizer,
+		.multisampleStateCI = multisampling,
+		.colourBlendStateCI = colourBlending,
+		.depthStencilStateCI = depthStencil,
+		.dynamicStateCI = dynamicState,
+		.bufferedRenderPassIndex = {},
+		.layeredBufferedRenderPassIndex = {(int)LBRP::shadow}
+	};
 	
 	
 	// hud
-	EVK::GraphicsPipelineBlueprint pbHud = {};
 	int hudImageIndex = 4;
-	pbHud.pipelineBlueprint.descriptorSetsN = 1;
-	EVK::DescriptorBlueprint hudDescriptorSetDescriptorBlueprints[3] = {
-		{
-			EVK::DescriptorType::UBO,
-			Pipeline_Hud::UBO::binding,
-			VK_SHADER_STAGE_VERTEX_BIT,
-			1,
-			&uboHudIndex
+	EVK::DescriptorSetBlueprint hudDescriptorSetBlueprint = {
+		(EVK::DescriptorBlueprint){
+			.type = EVK::DescriptorType::UBO,
+			.binding = Pipeline_Hud::UBO::binding,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+			.indicesExtra = {uboHudIndex}
 		},
-		{
-			EVK::DescriptorType::textureSampler,
-			Pipeline_Hud::textureSamplerBinding,
-			VK_SHADER_STAGE_FRAGMENT_BIT,
-			1,
-			&samplerMainIndex
+		(EVK::DescriptorBlueprint){
+			.type = EVK::DescriptorType::textureSampler,
+			.binding = Pipeline_Hud::textureSamplerBinding,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.indicesExtra = {samplerMainIndex}
 		},
-		{
-			EVK::DescriptorType::textureImage,
-			Pipeline_Hud::textureImagesBinding,
-			VK_SHADER_STAGE_FRAGMENT_BIT,
-			1,
-			&hudImageIndex
+		(EVK::DescriptorBlueprint){
+			.type = EVK::DescriptorType::textureImage,
+			.binding = Pipeline_Hud::textureImagesBinding,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.indicesExtra = {hudImageIndex}
 		}
 	};
-	EVK::DescriptorSetBlueprint hudDescriptorSetBlueprints[1] = {{3, hudDescriptorSetDescriptorBlueprints}};
-	pbHud.pipelineBlueprint.descriptorSetBlueprints = hudDescriptorSetBlueprints;
-	pbHud.pipelineBlueprint.pushConstantRangesN = 0;
-	pbHud.stageCount = 2;
-	VkPipelineShaderStageCreateInfo hudShaderStages[2];
-	memcpy(hudShaderStages, shaderStages, 2*sizeof(VkPipelineShaderStageCreateInfo));
+	std::vector<VkPipelineShaderStageCreateInfo> hudShaderStages = shaderStages;
 	hudShaderStages[0].module = devices.CreateShaderModule("../Resources/Shaders/vertHud.spv");
 	hudShaderStages[1].module = devices.CreateShaderModule("../Resources/Shaders/fragHud.spv");
-	pbHud.shaderStageCIs = hudShaderStages;
 	vertexInputInfo = Pipeline_Hud::Attributes::stateCI;
-	pbHud.vertexInputStateCI = vertexInputInfo;
 	rasterizer.cullMode = VK_CULL_MODE_NONE;
 	rasterizer.depthBiasEnable = VK_FALSE;
-	pbHud.rasterisationStateCI = rasterizer;
 #ifdef MSAA
 	multisampling.rasterizationSamples = devices.GetMSAASamples();
 #else
 	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 #endif
-	pbHud.multisampleStateCI = multisampling;
 	colourBlending.attachmentCount = 1;
-	pbHud.colourBlendStateCI = colourBlending;
 	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
-	pbHud.depthStencilStateCI = depthStencil;
 	dynamicState.dynamicStateCount = 2;
-	pbHud.dynamicStateCI = dynamicState;
-	pbHud.bufferedRenderPassIndex = (int)BRP::finall;
-	pbHud.layeredBufferedRenderPassIndex = -1;
+	EVK::GraphicsPipelineBlueprint pbHud = {
+		.pipelineBlueprint = {
+			.descriptorSetBlueprints = {hudDescriptorSetBlueprint},
+			.pushConstantRanges = {}
+		},
+		.shaderStageCIs = hudShaderStages,
+		.vertexInputStateCI = vertexInputInfo,
+		.rasterisationStateCI = rasterizer,
+		.multisampleStateCI = multisampling,
+		.colourBlendStateCI = colourBlending,
+		.depthStencilStateCI = depthStencil,
+		.dynamicStateCI = dynamicState,
+		.bufferedRenderPassIndex = {(int)BRP::finall},
+		.layeredBufferedRenderPassIndex = {}
+	};
 	
 	
 	// skybox
-	EVK::GraphicsPipelineBlueprint pbSkybox = {};
-	pbSkybox.pipelineBlueprint.descriptorSetsN = 1;
-	EVK::DescriptorBlueprint skyboxDescriptorSetDescriptorBlueprints[2] = {
-		{
-			EVK::DescriptorType::UBO,
-			Pipeline_Skybox::UBO_Global::binding,
-			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-			1,
-			&uboSkyboxIndex
+	
+	EVK::DescriptorSetBlueprint skyboxDescriptorSetBlueprint = {
+		(EVK::DescriptorBlueprint){
+			.type = EVK::DescriptorType::UBO,
+			.binding = Pipeline_Skybox::UBO_Global::binding,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+			.indicesExtra = {uboSkyboxIndex}
 		},
-		{
-			EVK::DescriptorType::combinedImageSampler,
-			Pipeline_Skybox::cubemapBinding,
-			VK_SHADER_STAGE_FRAGMENT_BIT,
-			1,
-			&skyboxImageIndex,
-			&skyboxSamplerIndex
+		(EVK::DescriptorBlueprint){
+			.type = EVK::DescriptorType::combinedImageSampler,
+			.binding = Pipeline_Skybox::cubemapBinding,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.indicesExtra = {skyboxImageIndex},
+			.indicesExtra2 = {skyboxSamplerIndex}
 		}
 	};
-	EVK::DescriptorSetBlueprint skyboxDescriptorSetBlueprints[1] = {{2, skyboxDescriptorSetDescriptorBlueprints}};
-	pbSkybox.pipelineBlueprint.descriptorSetBlueprints = skyboxDescriptorSetBlueprints;
-	pbSkybox.pipelineBlueprint.pushConstantRangesN = 0;
-	pbSkybox.stageCount = 2;
-	VkPipelineShaderStageCreateInfo skyboxShaderStages[2];
-	memcpy(skyboxShaderStages, shaderStages, 2*sizeof(VkPipelineShaderStageCreateInfo));
+	std::vector<VkPipelineShaderStageCreateInfo> skyboxShaderStages = shaderStages;
 	skyboxShaderStages[0].module = devices.CreateShaderModule("../Resources/Shaders/vertSkybox.spv");
 	skyboxShaderStages[1].module = devices.CreateShaderModule("../Resources/Shaders/fragSkybox.spv");
-	pbSkybox.shaderStageCIs = skyboxShaderStages;
 	vertexInputInfo = Pipeline_Skybox::Attributes::stateCI;
-	pbSkybox.vertexInputStateCI = vertexInputInfo;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-	pbSkybox.rasterisationStateCI = rasterizer;
-	pbSkybox.multisampleStateCI = multisampling;
-	pbSkybox.colourBlendStateCI = colourBlending;
 	depthStencil.depthTestEnable = VK_FALSE;
-	pbSkybox.depthStencilStateCI = depthStencil;
-	pbSkybox.dynamicStateCI = dynamicState;
-	pbSkybox.bufferedRenderPassIndex = (int)BRP::finall;
-	pbSkybox.layeredBufferedRenderPassIndex = -1;
+	EVK::GraphicsPipelineBlueprint pbSkybox = {
+		.pipelineBlueprint = {
+			.descriptorSetBlueprints = {skyboxDescriptorSetBlueprint},
+			.pushConstantRanges = {}
+		},
+		.shaderStageCIs = skyboxShaderStages,
+		.vertexInputStateCI = vertexInputInfo,
+		.rasterisationStateCI = rasterizer,
+		.multisampleStateCI = multisampling,
+		.colourBlendStateCI = colourBlending,
+		.depthStencilStateCI = depthStencil,
+		.dynamicStateCI = dynamicState,
+		.bufferedRenderPassIndex = {(int)BRP::finall},
+		.layeredBufferedRenderPassIndex = {}
+	};
 	
 	// final
-	EVK::GraphicsPipelineBlueprint pbFinal = {};
-	pbFinal.pipelineBlueprint.descriptorSetsN = 1;
-	EVK::DescriptorBlueprint finalDescriptorSetDescriptorBlueprints[1] = {
-		{
-			EVK::DescriptorType::combinedImageSampler,
-			Pipeline_Final::textureBinding,
-			VK_SHADER_STAGE_FRAGMENT_BIT,
-			1,
-			&finalColourImageIndex,
-			&samplerMainIndex
+	EVK::DescriptorSetBlueprint finalDescriptorSetBlueprint = {
+		(EVK::DescriptorBlueprint){
+			.type = EVK::DescriptorType::combinedImageSampler,
+			.binding = Pipeline_Final::textureBinding,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.indicesExtra = {finalColourImageIndex},
+			.indicesExtra2 = {samplerMainIndex}
 		}
 	};
-	EVK::DescriptorSetBlueprint finalDescriptorSetBlueprints[1] = {{1, finalDescriptorSetDescriptorBlueprints}};
-	pbFinal.pipelineBlueprint.descriptorSetBlueprints = finalDescriptorSetBlueprints;
-	pbFinal.pipelineBlueprint.pushConstantRangesN = 0;
-	pbFinal.stageCount = 2;
-	VkPipelineShaderStageCreateInfo finalShaderStages[2];
-	memcpy(finalShaderStages, shaderStages, 2*sizeof(VkPipelineShaderStageCreateInfo));
+	std::vector<VkPipelineShaderStageCreateInfo> finalShaderStages = shaderStages;
 	finalShaderStages[0].module = devices.CreateShaderModule("../Resources/Shaders/vertFinal.spv");
 	finalShaderStages[1].module = devices.CreateShaderModule("../Resources/Shaders/fragFinal.spv");
-	pbFinal.shaderStageCIs = finalShaderStages;
 	vertexInputInfo = Pipeline_Final::Attributes::stateCI;
-	pbFinal.vertexInputStateCI = vertexInputInfo;
 	rasterizer.cullMode = VK_CULL_MODE_NONE;
 	rasterizer.depthBiasEnable = VK_FALSE;
-	pbFinal.rasterisationStateCI = rasterizer;
 #ifdef MSAA
 	multisampling.rasterizationSamples = devices.GetMSAASamples();
 #else
 	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 #endif
-	pbFinal.multisampleStateCI = multisampling;
 	colourBlending.attachmentCount = 1;
-	pbFinal.colourBlendStateCI = colourBlending;
 	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
-	pbFinal.depthStencilStateCI = depthStencil;
 	dynamicState.dynamicStateCount = 2;
-	pbFinal.dynamicStateCI = dynamicState;
-	pbFinal.bufferedRenderPassIndex = -1;
-	pbFinal.layeredBufferedRenderPassIndex = -1;
+	EVK::GraphicsPipelineBlueprint pbFinal = {
+		.pipelineBlueprint = {
+			.descriptorSetBlueprints = {finalDescriptorSetBlueprint},
+			.pushConstantRanges = {}
+		},
+		.shaderStageCIs = finalShaderStages,
+		.vertexInputStateCI = vertexInputInfo,
+		.rasterisationStateCI = rasterizer,
+		.multisampleStateCI = multisampling,
+		.colourBlendStateCI = colourBlending,
+		.depthStencilStateCI = depthStencil,
+		.dynamicStateCI = dynamicState,
+		.bufferedRenderPassIndex = {},
+		.layeredBufferedRenderPassIndex = {}
+	};
 	
 	
-	EVK::InterfaceBlueprint nvi = {devices};
+	EVK::InterfaceBlueprint nvi = {
+		.devices = devices
+	};
 	
-	nvi.graphicsPipelinesN = GRAPHICS_PIPELINES_N;
-	EVK::GraphicsPipelineBlueprint pbs[GRAPHICS_PIPELINES_N];
+	std::vector<EVK::GraphicsPipelineBlueprint> pbs(GRAPHICS_PIPELINES_N);
 	pbs[(int)GraphicsPipeline::mainInstanced] = pbMainInstanced;
 	pbs[(int)GraphicsPipeline::mainOnce] = pbMainOnce;
 	pbs[(int)GraphicsPipeline::shadowInstanced] = pbShadowInstanced;
@@ -481,74 +467,73 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, EVK::ImageBlueprin
 	pbs[(int)GraphicsPipeline::finall] = pbFinal;
 	nvi.graphicsPipelineBlueprints = pbs;
 	
-	EVK::ComputePipelineBlueprint cb;
-	EVK::DescriptorBlueprint histogramDescriptorSetDescriptorBlueprints[3] = {
-		{
-			EVK::DescriptorType::UBO,
-			Pipeline_Histogram::UBO::binding,
-			VK_SHADER_STAGE_COMPUTE_BIT,
-			1,
-			&histogramUboIndex
-		},
-		{
-			EVK::DescriptorType::storageImage,
-			Pipeline_Histogram::hdrImageBinding,
-			VK_SHADER_STAGE_COMPUTE_BIT,
-			1,
-			&finalColourImageIndex
-		},
-		{
-			EVK::DescriptorType::SBO,
-			Pipeline_Histogram::SBO::binding,
-			VK_SHADER_STAGE_COMPUTE_BIT,
-			1,
-			&histogramSboIndex
-		}
-	};
-	EVK::DescriptorSetBlueprint histogramDescriptorSetBlueprint = {3, histogramDescriptorSetDescriptorBlueprints};
-	cb.pipelineBlueprint.descriptorSetsN = 1;
-	cb.pipelineBlueprint.descriptorSetBlueprints = &histogramDescriptorSetBlueprint;
-	cb.pipelineBlueprint.pushConstantRangesN = 0;
-	memcpy(&cb.shaderStageCI, shaderStages, sizeof(VkPipelineShaderStageCreateInfo));
-	cb.shaderStageCI.module = devices.CreateShaderModule("../Resources/Shaders/histogram.spv");
-	nvi.computePipelinesN = 1;
-	nvi.computePipelineBlueprints = &cb;
+//	EVK::ComputePipelineBlueprint cb;
+//	EVK::DescriptorBlueprint histogramDescriptorSetDescriptorBlueprints[3] = {
+//		{
+//			EVK::DescriptorType::UBO,
+//			Pipeline_Histogram::UBO::binding,
+//			VK_SHADER_STAGE_COMPUTE_BIT,
+//			1,
+//			&histogramUboIndex
+//		},
+//		{
+//			EVK::DescriptorType::storageImage,
+//			Pipeline_Histogram::hdrImageBinding,
+//			VK_SHADER_STAGE_COMPUTE_BIT,
+//			1,
+//			&finalColourImageIndex
+//		},
+//		{
+//			EVK::DescriptorType::SBO,
+//			Pipeline_Histogram::SBO::binding,
+//			VK_SHADER_STAGE_COMPUTE_BIT,
+//			1,
+//			&histogramSboIndex
+//		}
+//	};
+//	EVK::DescriptorSetBlueprint histogramDescriptorSetBlueprint = {3, histogramDescriptorSetDescriptorBlueprints};
+//	cb.pipelineBlueprint.descriptorSetsN = 1;
+//	cb.pipelineBlueprint.descriptorSetBlueprints = &histogramDescriptorSetBlueprint;
+//	cb.pipelineBlueprint.pushConstantRangesN = 0;
+//	memcpy(&cb.shaderStageCI, shaderStages, sizeof(VkPipelineShaderStageCreateInfo));
+//	cb.shaderStageCI.module = devices.CreateShaderModule("../Resources/Shaders/histogram.spv");
+	nvi.computePipelineBlueprints = {};
+//	nvi.computePipelineBlueprints = &cb;
 	
-	nvi.uniformBufferObjectsN = Globals::ubosN;
-	nvi.uboBlueprints = (EVK::UniformBufferObjectBlueprint[Globals::ubosN]){
-		{sizeof(Shared_Main::UBO_Global), 1},
-		{sizeof(Shared_Main::PerObject), Globals::MainOnce::renderedN},
-		{sizeof(Pipeline_Hud::UBO), 1},
-		{sizeof(Shared_Shadow::UBO_Global), 1},
-		{sizeof(Pipeline_Skybox::UBO_Global), 1},
-		{sizeof(Pipeline_Histogram::UBO), 1}
-	};
-	
-	nvi.storageBufferObjectsN = 1;
-	nvi.sboBlueprints = (EVK::StorageBufferObjectBlueprint[1]){
-		{sizeof(Pipeline_Histogram::SBO)}
+	nvi.uboBlueprints = {
+		{sizeof(Shared_Main::UBO_Global), {}},
+		{sizeof(Shared_Main::PerObject), {Globals::MainOnce::renderedN}},
+		{sizeof(Pipeline_Hud::UBO), {}},
+		{sizeof(Shared_Shadow::UBO_Global), {}},
+		{sizeof(Pipeline_Skybox::UBO_Global), {}},
+		{sizeof(Pipeline_Histogram::UBO), {}}
 	};
 	
-	nvi.textureSamplersN = SAMPLERS_N;
-	VkSamplerCreateInfo sbs[SAMPLERS_N];
-	VkSamplerCreateInfo samplerInfo{};
-	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerInfo.magFilter = VK_FILTER_LINEAR;
-	samplerInfo.minFilter = VK_FILTER_LINEAR;
-	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	samplerInfo.anisotropyEnable = VK_TRUE;
-	samplerInfo.maxAnisotropy = devices.GetPhysicalDeviceProperties().limits.maxSamplerAnisotropy;
-	samplerInfo.unnormalizedCoordinates = VK_FALSE; // 'VK_TRUE' would mean texture coordinates are (0, texWidth), (0, texHeight)
-	samplerInfo.compareEnable = VK_FALSE;
-	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerInfo.mipLodBias = 0.0f; // Optional
-	samplerInfo.minLod = 0.0f; // Optional
-	samplerInfo.maxLod = 20.0f; // max level of detail (miplevels)
-	sbs[(int)Sampler::main] = samplerInfo;
+	nvi.sboBlueprints = {};
+//	nvi.sboBlueprints = (EVK::StorageBufferObjectBlueprint[1]){
+//		{sizeof(Pipeline_Histogram::SBO)}
+//	};
+	
+	nvi.samplerBlueprints = std::vector<VkSamplerCreateInfo>(SAMPLERS_N);
+	VkSamplerCreateInfo samplerInfo{
+		.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+		.magFilter = VK_FILTER_LINEAR,
+		.minFilter = VK_FILTER_LINEAR,
+		.addressModeU = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
+		.addressModeV = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
+		.addressModeW = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
+		.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+		.anisotropyEnable = VK_TRUE,
+		.maxAnisotropy = devices.GetPhysicalDeviceProperties().limits.maxSamplerAnisotropy,
+		.unnormalizedCoordinates = VK_FALSE, // 'VK_TRUE' would mean texture coordinates are (0, texWidth), (0, texHeight)
+		.compareEnable = VK_FALSE,
+		.compareOp = VK_COMPARE_OP_ALWAYS,
+		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.mipLodBias = 0.0f, // Optional
+		.minLod = 0.0f, // Optional
+		.maxLod = 20.0f // max level of detail (miplevels)
+	};
+	nvi.samplerBlueprints[(int)Sampler::main] = samplerInfo;
 	
 	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
@@ -556,7 +541,7 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, EVK::ImageBlueprin
 	samplerInfo.maxAnisotropy = 1.0f;
 	samplerInfo.compareEnable = VK_FALSE;
 	samplerInfo.compareOp = VK_COMPARE_OP_NEVER;
-	sbs[(int)Sampler::cube] = samplerInfo;
+	nvi.samplerBlueprints[(int)Sampler::cube] = samplerInfo;
 	
 	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
@@ -564,33 +549,34 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, EVK::ImageBlueprin
 	samplerInfo.maxLod = 1.0f;
 	samplerInfo.compareEnable = VK_FALSE;
 	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-	VkFilter shadowmap_filter = (devices.GetFormatProperties(DEPTH_FORMAT).optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+	const VkFilter shadowmap_filter = (devices.GetFormatProperties(DEPTH_FORMAT).optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
 	samplerInfo.magFilter = shadowmap_filter;
 	samplerInfo.minFilter = shadowmap_filter;
-	sbs[(int)Sampler::shadow] = samplerInfo;
-	
-	nvi.samplerBlueprints = sbs;
+	nvi.samplerBlueprints[(int)Sampler::shadow] = samplerInfo;
 	
 	// Creating the shadow mapping render pass
-	VkAttachmentDescription lbAttachmentDescription{};
-	lbAttachmentDescription.format = DEPTH_FORMAT;
-	lbAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-	lbAttachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;							// Clear depth at beginning of the render pass
-	lbAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;						// We will read from depth, so it's important to store the depth attachment results
-	lbAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	lbAttachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	lbAttachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;					// We don't care about initial layout of the attachment
-	lbAttachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;// Attachment will be transitioned to shader read at render pass end
+	VkAttachmentDescription lbAttachmentDescription{
+		.format = DEPTH_FORMAT,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,							// Clear depth at beginning of the render pass
+		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,						// We will read from depth, so it's important to store the depth attachment results
+		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,					// We don't care about initial layout of the attachment
+		.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL// Attachment will be transitioned to shader read at render pass end
+	};
 	
-	VkAttachmentReference lbDepthReference = {};
-	lbDepthReference.attachment = 0;
-	lbDepthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;			// Attachment will be used as depth/stencil during render pass
-	
-	VkSubpassDescription lbSubpass = {};
-	lbSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	lbSubpass.colorAttachmentCount = 0;													// No color attachments
-	lbSubpass.pDepthStencilAttachment = &lbDepthReference;									// Reference to our depth attachment
-	
+	VkAttachmentReference lbDepthReference = {
+		.attachment = 0,
+		.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL			// Attachment will be used as depth/stencil during render pass
+	};
+		
+	VkSubpassDescription lbSubpass = {
+		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+		.colorAttachmentCount = 0,													// No color attachments
+		.pDepthStencilAttachment = &lbDepthReference									// Reference to our depth attachment
+	};
+		
 	// Use subpass dependencies for layout transitions
 	VkSubpassDependency lbDependencies[2];
 	lbDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -608,66 +594,71 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, EVK::ImageBlueprin
 	lbDependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 	lbDependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 	
-	VkRenderPassCreateInfo lbBenderPassCreateInfo = {};
-	lbBenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	lbBenderPassCreateInfo.attachmentCount = 1;
-	lbBenderPassCreateInfo.pAttachments = &lbAttachmentDescription;
-	lbBenderPassCreateInfo.subpassCount = 1;
-	lbBenderPassCreateInfo.pSubpasses = &lbSubpass;
-	lbBenderPassCreateInfo.dependencyCount = 2;
-	lbBenderPassCreateInfo.pDependencies = lbDependencies;
-	EVK::LayeredBufferedRenderPassBlueprint lbrpb = {
-		lbBenderPassCreateInfo,
-		shadowMapImageIndex,
-		SHADOWMAP_DIM,
-		SHADOWMAP_DIM,
-		SHADOW_MAP_CASCADE_COUNT,
-		DEPTH_FORMAT,
-		VK_IMAGE_ASPECT_DEPTH_BIT
+	VkRenderPassCreateInfo lbBenderPassCreateInfo = {
+		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+		.attachmentCount = 1,
+		.pAttachments = &lbAttachmentDescription,
+		.subpassCount = 1,
+		.pSubpasses = &lbSubpass,
+		.dependencyCount = 2,
+		.pDependencies = lbDependencies
 	};
-	nvi.layeredBufferedRenderPassesN = LAYERED_BUFFERED_RENDER_PASSES_N;
-	nvi.layeredBufferedRenderPassBlueprints = &lbrpb;
+	EVK::LayeredBufferedRenderPassBlueprint lbrpb = {
+		.renderPassCI = lbBenderPassCreateInfo,
+		.targetTextureImageIndex = shadowMapImageIndex,
+		.width = SHADOWMAP_DIM,
+		.height = SHADOWMAP_DIM,
+		.layersN = SHADOW_MAP_CASCADE_COUNT,
+		.imageFormat = DEPTH_FORMAT,
+		.imageAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT
+	};
+	nvi.layeredBufferedRenderPassBlueprints = {lbrpb};
 	
 	// Creating the final render pass
-	static VkAttachmentDescription colourAttachment{};
-	colourAttachment.format = FINAL_FORMAT;
+	static VkAttachmentDescription colourAttachment{
+		.format = FINAL_FORMAT,
 #ifdef MSAA
-	colourAttachment.samples = devices.GetMSAASamples();
+		.samples = devices.GetMSAASamples(),
 #else
-	colourAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		.samples = VK_SAMPLE_COUNT_1_BIT,
 #endif
-	colourAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	colourAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	colourAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	colourAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	colourAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	colourAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	static VkAttachmentReference colourAttachmentRef{};
-	colourAttachmentRef.attachment = 0;
-	colourAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+	};
+	static VkAttachmentReference colourAttachmentRef{
+		.attachment = 0,
+		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+	};
 	
-	static VkAttachmentDescription depthAttachment{};
-	depthAttachment.format = devices.FindDepthFormat();
+	static VkAttachmentDescription depthAttachment{
+		.format = devices.FindDepthFormat(),
 #ifdef MSAA
-	depthAttachment.samples = devices.GetMSAASamples();
+		.samples = devices.GetMSAASamples(),
 #else
-	depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		.samples = VK_SAMPLE_COUNT_1_BIT,
 #endif
-	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-	static VkAttachmentReference depthAttachmentRef{};
-	depthAttachmentRef.attachment = 1;
-	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+		.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+	};
+	static VkAttachmentReference depthAttachmentRef{
+		.attachment = 1,
+		.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+	};
 	
-	static VkSubpassDescription subpass{};
-	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = 1;
-	subpass.pColorAttachments = &colourAttachmentRef;
-	subpass.pDepthStencilAttachment = &depthAttachmentRef;
+	static VkSubpassDescription subpass{
+		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+		.colorAttachmentCount = 1,
+		.pColorAttachments = &colourAttachmentRef,
+		.pDepthStencilAttachment = &depthAttachmentRef
+	};
 	
 	// Use subpass dependencies for layout transitions
 	static VkSubpassDependency bDependencies[2];
@@ -686,29 +677,25 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, EVK::ImageBlueprin
 	bDependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 	bDependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 	
-	static VkRenderPassCreateInfo bRenderPassCreateInfo = {};
-	bRenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	bRenderPassCreateInfo.attachmentCount = 2;
 	static VkAttachmentDescription attachments[2] = {colourAttachment, depthAttachment};
-	bRenderPassCreateInfo.pAttachments = attachments;
-	bRenderPassCreateInfo.subpassCount = 1;
-	bRenderPassCreateInfo.pSubpasses = &subpass;
-	bRenderPassCreateInfo.dependencyCount = 2;
-	bRenderPassCreateInfo.pDependencies = bDependencies;
-	static int brpImages[2] = {finalColourImageIndex, finalDepthImageIndex};
-	EVK::BufferedRenderPassBlueprint brpb = {
-		bRenderPassCreateInfo,
-		2,
-		brpImages,
-		0, // resises with window
-		0 //
+	static VkRenderPassCreateInfo bRenderPassCreateInfo = {
+		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+		.attachmentCount = 2,
+		.pAttachments = attachments,
+		.subpassCount = 1,
+		.pSubpasses = &subpass,
+		.dependencyCount = 2,
+		.pDependencies = bDependencies
 	};
-	nvi.bufferedRenderPassesN = BUFFERED_RENDER_PASSES_N;
-	nvi.bufferedRenderPassBlueprints = &brpb;
+	EVK::BufferedRenderPassBlueprint brpb = {
+		.renderPassCI = bRenderPassCreateInfo,
+		.targetTextureImageIndices = {finalColourImageIndex, finalDepthImageIndex},
+		.width = 0, // resises with window
+	};
+	nvi.bufferedRenderPassBlueprints = {brpb};
 	
 	nvi.vertexBuffersN = Globals::vertexBuffersN;
 	nvi.indexBuffersN = Globals::indexBuffersN;
-	nvi.textureImagesN = Globals::texturesN;
 	nvi.imageBlueprintPtrs = imageBlueprintPtrs;
 	
 	return EVK::Interface(nvi);
