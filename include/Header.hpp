@@ -5,8 +5,8 @@
 #include <sys/time.h>
 
 #include <mattresses.h>
-#include <ESDL/ESDL_General.hpp>
-#include <ESDL/ESDL_EventHandler.hpp>
+#include <ESDL/ESDL_General.h>
+#include <ESDL/ESDL_EventHandler.h>
 #include <evk/Base.hpp>
 
 #include <ReadProcessedObj.hpp>

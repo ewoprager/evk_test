@@ -33,6 +33,9 @@ add_executable(${PROJECT_NAME}
             "${CMAKE_CURRENT_SOURCE_DIR}/${UNPROCESSED_SHADERS}"
             )
 
+execute_process(COMMAND ./compile.sh
+				WORKING_DIRECTORY "UnprocessedShaders")
+
 file(COPY "Resources/"
      DESTINATION "Resources/")
 

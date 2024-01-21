@@ -39,10 +39,10 @@ void UpdateCascades(Shared_Main::UBO_Global *mainUboGlobal, Shared_Shadow::UBO_G
 		};
 
 		// Project frustum corners into world space
-		mat<4, 4> viewProjection = Dot(mainUboGlobal->proj, mainUboGlobal->viewInv);
+		mat<4, 4> viewProjection = mainUboGlobal->proj & mainUboGlobal->viewInv;
 		mat<4, 4> invCam = viewProjection.Inverted();
 		for(int i=0; i<8; i++){
-			vec<4> invCorner = Dot(invCam, frustumCorners[i] | 1.0f);
+			vec<4> invCorner = invCam & (frustumCorners[i] | 1.0f);
 			frustumCorners[i] = (vec<3>){invCorner.x, invCorner.y, invCorner.z} / invCorner.w;
 		}
 
@@ -69,7 +69,7 @@ void UpdateCascades(Shared_Main::UBO_Global *mainUboGlobal, Shared_Shadow::UBO_G
 		
 		// Store split distance and matrix in cascade
 		mainUboGlobal->cascadeSplits[i] = (minZ + splitDist * range) * -1.0f;
-		mainUboGlobal->lightMat[i] = Dot(lightOrthoMatrix, lightViewMatrix);
+		mainUboGlobal->lightMat[i] = lightOrthoMatrix & lightViewMatrix;
 		shadowUboGlobal->viewInvProj[i] = mainUboGlobal->lightMat[i];
 		
 		lastSplitDist = cascadeSplits[i];

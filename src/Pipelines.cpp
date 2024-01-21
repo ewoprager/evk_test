@@ -9,18 +9,18 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, const std::vector<
 	rasterizer.depthClampEnable = VK_FALSE;
 	
 	//If depthClampEnable is set to VK_TRUE, then fragments that are beyond the near and far planes are clamped to them as opposed to discarding them. This is useful in some special cases like shadow maps.
-	 
+	
 	//Using this requires enabling a GPU feature.
 	
 	rasterizer.rasterizerDiscardEnable = VK_FALSE;
 	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 	
 	//The polygonMode determines how fragments are generated for geometry. The following modes are available:
-	 
+	
 	//VK_POLYGON_MODE_FILL: fill the area of the polygon with fragments
 	//VK_POLYGON_MODE_LINE: polygon edges are drawn as lines
 	//VK_POLYGON_MODE_POINT: polygon vertices are drawn as points
-	 
+	
 	//Using any mode other than fill requires enabling a GPU feature.
 	
 	rasterizer.lineWidth = 1.0f;
@@ -211,24 +211,24 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, const std::vector<
 	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 	dynamicState.dynamicStateCount = 2;
 #ifdef MSAA
-		multisampling.rasterizationSamples = devices.GetMSAASamples();
+	multisampling.rasterizationSamples = devices.GetMSAASamples();
 #else
-		multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 #endif
 	EVK::GraphicsPipelineBlueprint pbMainInstanced = {
 		.pipelineBlueprint = {
 			.descriptorSetBlueprints = {mainDescriptorSetBlueprint},
 			.pushConstantRanges = mainPushConstantRanges
 		},
-		.shaderStageCIs = mainInstancedShaderStages,
-		.vertexInputStateCI = vertexInputInfo,
-		.rasterisationStateCI = rasterizer,
-		.multisampleStateCI = multisampling,
-		.colourBlendStateCI = colourBlending,
-		.depthStencilStateCI = depthStencil,
-		.dynamicStateCI = dynamicState,
-		.bufferedRenderPassIndex = {(int)BRP::finall},
-		.layeredBufferedRenderPassIndex = {}
+			.shaderStageCIs = mainInstancedShaderStages,
+			.vertexInputStateCI = vertexInputInfo,
+			.rasterisationStateCI = rasterizer,
+			.multisampleStateCI = multisampling,
+			.colourBlendStateCI = colourBlending,
+			.depthStencilStateCI = depthStencil,
+			.dynamicStateCI = dynamicState,
+			.bufferedRenderPassIndex = {(int)BRP::finall},
+			.layeredBufferedRenderPassIndex = {}
 	};
 	
 	// shadow instanced
@@ -245,15 +245,15 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, const std::vector<
 			.descriptorSetBlueprints = {shadowDescriptorSetBlueprint},
 			.pushConstantRanges = {shadowPushConstantRange}
 		},
-		.shaderStageCIs = {shadowInstancedShaderStage},
-		.vertexInputStateCI = vertexInputInfo, // same as mainInstanced
-		.rasterisationStateCI = rasterizer,
-		.multisampleStateCI = multisampling,
-		.colourBlendStateCI = colourBlending,
-		.depthStencilStateCI = depthStencil,
-		.dynamicStateCI = dynamicState,
-		.bufferedRenderPassIndex = {},
-		.layeredBufferedRenderPassIndex = {(int)LBRP::shadow}
+			.shaderStageCIs = {shadowInstancedShaderStage},
+			.vertexInputStateCI = vertexInputInfo, // same as mainInstanced
+			.rasterisationStateCI = rasterizer,
+			.multisampleStateCI = multisampling,
+			.colourBlendStateCI = colourBlending,
+			.depthStencilStateCI = depthStencil,
+			.dynamicStateCI = dynamicState,
+			.bufferedRenderPassIndex = {},
+			.layeredBufferedRenderPassIndex = {(int)LBRP::shadow}
 	};
 	
 	
@@ -278,17 +278,17 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, const std::vector<
 				mainDescriptorSetBlueprint,
 				onceDescriptorSetBlueprint
 			},
-			.pushConstantRanges = mainPushConstantRanges
+				.pushConstantRanges = mainPushConstantRanges
 		},
-		.shaderStageCIs = mainOnceShaderStages,
-		.vertexInputStateCI = vertexInputInfo,
-		.rasterisationStateCI = rasterizer,
-		.multisampleStateCI = multisampling,
-		.colourBlendStateCI = colourBlending,
-		.depthStencilStateCI = depthStencil,
-		.dynamicStateCI = dynamicState,
-		.bufferedRenderPassIndex = {(int)BRP::finall},
-		.layeredBufferedRenderPassIndex = {}
+			.shaderStageCIs = mainOnceShaderStages,
+			.vertexInputStateCI = vertexInputInfo,
+			.rasterisationStateCI = rasterizer,
+			.multisampleStateCI = multisampling,
+			.colourBlendStateCI = colourBlending,
+			.depthStencilStateCI = depthStencil,
+			.dynamicStateCI = dynamicState,
+			.bufferedRenderPassIndex = {(int)BRP::finall},
+			.layeredBufferedRenderPassIndex = {}
 	};
 	
 	// shadow once
@@ -306,17 +306,17 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, const std::vector<
 				shadowDescriptorSetBlueprint,
 				onceDescriptorSetBlueprint
 			},
-			.pushConstantRanges = {shadowPushConstantRange}
+				.pushConstantRanges = {shadowPushConstantRange}
 		},
-		.shaderStageCIs = {shadowOnceShaderStage},
-		.vertexInputStateCI = vertexInputInfo, // same as mainOnce
-		.rasterisationStateCI = rasterizer,
-		.multisampleStateCI = multisampling,
-		.colourBlendStateCI = colourBlending,
-		.depthStencilStateCI = depthStencil,
-		.dynamicStateCI = dynamicState,
-		.bufferedRenderPassIndex = {},
-		.layeredBufferedRenderPassIndex = {(int)LBRP::shadow}
+			.shaderStageCIs = {shadowOnceShaderStage},
+			.vertexInputStateCI = vertexInputInfo, // same as mainOnce
+			.rasterisationStateCI = rasterizer,
+			.multisampleStateCI = multisampling,
+			.colourBlendStateCI = colourBlending,
+			.depthStencilStateCI = depthStencil,
+			.dynamicStateCI = dynamicState,
+			.bufferedRenderPassIndex = {},
+			.layeredBufferedRenderPassIndex = {(int)LBRP::shadow}
 	};
 	
 	
@@ -361,20 +361,19 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, const std::vector<
 			.descriptorSetBlueprints = {hudDescriptorSetBlueprint},
 			.pushConstantRanges = {}
 		},
-		.shaderStageCIs = hudShaderStages,
-		.vertexInputStateCI = vertexInputInfo,
-		.rasterisationStateCI = rasterizer,
-		.multisampleStateCI = multisampling,
-		.colourBlendStateCI = colourBlending,
-		.depthStencilStateCI = depthStencil,
-		.dynamicStateCI = dynamicState,
-		.bufferedRenderPassIndex = {(int)BRP::finall},
-		.layeredBufferedRenderPassIndex = {}
+			.shaderStageCIs = hudShaderStages,
+			.vertexInputStateCI = vertexInputInfo,
+			.rasterisationStateCI = rasterizer,
+			.multisampleStateCI = multisampling,
+			.colourBlendStateCI = colourBlending,
+			.depthStencilStateCI = depthStencil,
+			.dynamicStateCI = dynamicState,
+			.bufferedRenderPassIndex = {(int)BRP::finall},
+			.layeredBufferedRenderPassIndex = {}
 	};
 	
 	
 	// skybox
-	
 	EVK::DescriptorSetBlueprint skyboxDescriptorSetBlueprint = {
 		(EVK::DescriptorBlueprint){
 			.type = EVK::DescriptorType::UBO,
@@ -401,15 +400,15 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, const std::vector<
 			.descriptorSetBlueprints = {skyboxDescriptorSetBlueprint},
 			.pushConstantRanges = {}
 		},
-		.shaderStageCIs = skyboxShaderStages,
-		.vertexInputStateCI = vertexInputInfo,
-		.rasterisationStateCI = rasterizer,
-		.multisampleStateCI = multisampling,
-		.colourBlendStateCI = colourBlending,
-		.depthStencilStateCI = depthStencil,
-		.dynamicStateCI = dynamicState,
-		.bufferedRenderPassIndex = {(int)BRP::finall},
-		.layeredBufferedRenderPassIndex = {}
+			.shaderStageCIs = skyboxShaderStages,
+			.vertexInputStateCI = vertexInputInfo,
+			.rasterisationStateCI = rasterizer,
+			.multisampleStateCI = multisampling,
+			.colourBlendStateCI = colourBlending,
+			.depthStencilStateCI = depthStencil,
+			.dynamicStateCI = dynamicState,
+			.bufferedRenderPassIndex = {(int)BRP::finall},
+			.layeredBufferedRenderPassIndex = {}
 	};
 	
 	// final
@@ -441,15 +440,15 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, const std::vector<
 			.descriptorSetBlueprints = {finalDescriptorSetBlueprint},
 			.pushConstantRanges = {}
 		},
-		.shaderStageCIs = finalShaderStages,
-		.vertexInputStateCI = vertexInputInfo,
-		.rasterisationStateCI = rasterizer,
-		.multisampleStateCI = multisampling,
-		.colourBlendStateCI = colourBlending,
-		.depthStencilStateCI = depthStencil,
-		.dynamicStateCI = dynamicState,
-		.bufferedRenderPassIndex = {},
-		.layeredBufferedRenderPassIndex = {}
+			.shaderStageCIs = finalShaderStages,
+			.vertexInputStateCI = vertexInputInfo,
+			.rasterisationStateCI = rasterizer,
+			.multisampleStateCI = multisampling,
+			.colourBlendStateCI = colourBlending,
+			.depthStencilStateCI = depthStencil,
+			.dynamicStateCI = dynamicState,
+			.bufferedRenderPassIndex = {},
+			.layeredBufferedRenderPassIndex = {}
 	};
 	
 	
@@ -467,38 +466,32 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, const std::vector<
 	pbs[(int)GraphicsPipeline::finall] = pbFinal;
 	nvi.graphicsPipelineBlueprints = pbs;
 	
-//	EVK::ComputePipelineBlueprint cb;
-//	EVK::DescriptorBlueprint histogramDescriptorSetDescriptorBlueprints[3] = {
-//		{
-//			EVK::DescriptorType::UBO,
-//			Pipeline_Histogram::UBO::binding,
-//			VK_SHADER_STAGE_COMPUTE_BIT,
-//			1,
-//			&histogramUboIndex
-//		},
-//		{
-//			EVK::DescriptorType::storageImage,
-//			Pipeline_Histogram::hdrImageBinding,
-//			VK_SHADER_STAGE_COMPUTE_BIT,
-//			1,
-//			&finalColourImageIndex
-//		},
-//		{
-//			EVK::DescriptorType::SBO,
-//			Pipeline_Histogram::SBO::binding,
-//			VK_SHADER_STAGE_COMPUTE_BIT,
-//			1,
-//			&histogramSboIndex
-//		}
-//	};
-//	EVK::DescriptorSetBlueprint histogramDescriptorSetBlueprint = {3, histogramDescriptorSetDescriptorBlueprints};
-//	cb.pipelineBlueprint.descriptorSetsN = 1;
-//	cb.pipelineBlueprint.descriptorSetBlueprints = &histogramDescriptorSetBlueprint;
-//	cb.pipelineBlueprint.pushConstantRangesN = 0;
-//	memcpy(&cb.shaderStageCI, shaderStages, sizeof(VkPipelineShaderStageCreateInfo));
-//	cb.shaderStageCI.module = devices.CreateShaderModule("../Resources/Shaders/histogram.spv");
-	nvi.computePipelineBlueprints = {};
-//	nvi.computePipelineBlueprints = &cb;
+	EVK::ComputePipelineBlueprint cb;
+	EVK::DescriptorSetBlueprint histogramDescriptorSetBlueprint = {
+		{
+			EVK::DescriptorType::UBO,
+			Pipeline_Histogram::UBO::binding,
+			VK_SHADER_STAGE_COMPUTE_BIT,
+			{histogramUboIndex}
+		},
+		{
+			EVK::DescriptorType::storageImage,
+			Pipeline_Histogram::hdrImageBinding,
+			VK_SHADER_STAGE_COMPUTE_BIT,
+			{finalColourImageIndex}
+		},
+		{
+			EVK::DescriptorType::SBO,
+			Pipeline_Histogram::SBO::binding,
+			VK_SHADER_STAGE_COMPUTE_BIT,
+			{histogramSboIndex}
+		}
+	};
+	cb.pipelineBlueprint.descriptorSetBlueprints = {histogramDescriptorSetBlueprint};
+	cb.pipelineBlueprint.pushConstantRanges = {};
+	cb.shaderStageCI = shaderStages[0];
+	cb.shaderStageCI.module = devices.CreateShaderModule("../Resources/Shaders/histogram.spv");
+	nvi.computePipelineBlueprints = {cb};
 	
 	nvi.uboBlueprints = {
 		{sizeof(Shared_Main::UBO_Global), {}},
@@ -509,10 +502,8 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, const std::vector<
 		{sizeof(Pipeline_Histogram::UBO), {}}
 	};
 	
-	nvi.sboBlueprints = {};
-//	nvi.sboBlueprints = (EVK::StorageBufferObjectBlueprint[1]){
-//		{sizeof(Pipeline_Histogram::SBO)}
-//	};
+	// !!! no idea if the bit masks are correct for this
+	nvi.sboBlueprints = {(EVK::StorageBufferObjectBlueprint){sizeof(Pipeline_Histogram::SBO), VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT}};
 	
 	nvi.samplerBlueprints = std::vector<VkSamplerCreateInfo>(SAMPLERS_N);
 	VkSamplerCreateInfo samplerInfo{

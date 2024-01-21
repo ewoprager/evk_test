@@ -144,10 +144,10 @@ public:
 		const float right = (float)(ESDL::GetKeyDown(SDLK_d) - ESDL::GetKeyDown(SDLK_a));
 		position += speed*dT*(vec<3>){forward*cy + right*sy, forward*sy - right*cy, (float)(ESDL::GetKeyDown(SDLK_SPACE) - ESDL::GetKeyDown(SDLK_LSHIFT))};
 		
-		perObjectDataPtr->model = Dot(Dot(mat<4, 4>::Translation((vec<2>){position.x, position.y} | 0.0f),
-																		  mat<4, 4>::ZRotation(0.5f * float(M_PI) + yaw)),
-																	  Dot(mat<4, 4>::XRotation(0.5f * float(M_PI)),
-																		  mat<4, 4>::Scaling({2.0f, 2.0f, 2.0f})));
+		perObjectDataPtr->model = mat<4, 4>::Translation((vec<2>){position.x, position.y} | 0.0f) &
+								  mat<4, 4>::ZRotation(0.5f * float(M_PI) + yaw) &
+								  mat<4, 4>::XRotation(0.5f * float(M_PI)) &
+								  mat<4, 4>::Scaling({2.0f, 2.0f, 2.0f});
 		
 		perObjectDataPtr->modelInvT = perObjectDataPtr->model.Inverted().Transposed();
 	}
@@ -158,9 +158,9 @@ public:
 	}
 	
 	const mat<4, 4> &GetViewInverseMatrix(){
-		viewInverseMatrix = (Dot(Dot(mat<4, 4>::Translation(position),
-									 mat<4, 4>::ZRotation(-0.5f * float(M_PI) + yaw)),
-								 mat<4, 4>::XRotation(0.5f * float(M_PI) + pitch))).Inverted();
+		viewInverseMatrix = (mat<4, 4>::Translation(position) &
+							 mat<4, 4>::ZRotation(-0.5f * float(M_PI) + yaw) &
+							 mat<4, 4>::XRotation(0.5f * float(M_PI) + pitch)).Inverted();
 		return viewInverseMatrix;
 	}
 	
@@ -198,9 +198,9 @@ public:
 	
 	void Update(float dT, Shared_Main::PerObject *perObjectDataPtr) override {
 		
-		perObjectDataPtr->model = Dot(Dot(mat<4, 4>::Translation(position | 0.0f),
-																		  mat<4, 4>::ZRotation(angle)),
-																	  mat<4, 4>::XRotation(0.5f * float(M_PI)));
+		perObjectDataPtr->model = (mat<4, 4>::Translation(position | 0.0f) &
+								   mat<4, 4>::ZRotation(angle) &
+								   mat<4, 4>::XRotation(0.5f * float(M_PI)));
 		
 		perObjectDataPtr->modelInvT = perObjectDataPtr->model.Inverted().Transposed();
 		
@@ -233,7 +233,11 @@ public:
 	void Update(float dT, Shared_Main::PerObject *perObjectDataPtr) override {
 		*perObjectDataPtr = chair->GetInstanceData();
 		
-		perObjectDataPtr->model = Dot(Dot(Dot(perObjectDataPtr->model, mat<4, 4>::Translation({-5.0f, 27.0f, 0.0f})), Dot(mat<4, 4>::Scaling({5.0f, 5.0f, 5.0f}), mat<4, 4>::ZRotation(-0.5f * float(M_PI)))), mat<4, 4>::XRotation(0.5f * float(M_PI)));
+		perObjectDataPtr->model = (perObjectDataPtr->model &
+								   mat<4, 4>::Translation({-5.0f, 27.0f, 0.0f}) &
+								   mat<4, 4>::Scaling({5.0f, 5.0f, 5.0f}) &
+								   mat<4, 4>::ZRotation(-0.5f * float(M_PI)) &
+								   mat<4, 4>::XRotation(0.5f * float(M_PI)));
 		
 		perObjectDataPtr->modelInvT = perObjectDataPtr->model.Inverted().Transposed();
 	}
@@ -365,7 +369,25 @@ int main(int argc, const char * argv[]) {
 	
 	SDL_Window *window = SDL_CreateWindow("VulkanFirst", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1024, 768, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_FULLSCREEN_DESKTOP);
 	
-	EVK::Devices devices = EVK::Devices(window);
+	uint32_t requiredExtensionCount;
+	SDL_Vulkan_GetInstanceExtensions(window, &requiredExtensionCount, nullptr);
+	std::vector<const char *> requiredExtensions(requiredExtensionCount);
+	SDL_Vulkan_GetInstanceExtensions(window, &requiredExtensionCount, requiredExtensions.data());
+	EVK::Devices devices = EVK::Devices("VulkanFirst", requiredExtensions,
+										[window](VkInstance instance) -> VkSurfaceKHR {
+		VkSurfaceKHR ret;
+		if(SDL_Vulkan_CreateSurface(window, instance, &ret) == SDL_FALSE)
+			throw std::runtime_error("failed to create window devices.surface!");
+		return ret;
+	},
+										[window]() -> VkExtent2D {
+		int width, height;
+		SDL_GL_GetDrawableSize(window, &width, &height);
+		return (VkExtent2D){
+			.width = uint32_t(width),
+			.height = uint32_t(height)
+		};
+	});
 	
 	int skyboxImageIndex;
 	{ // preparing skybox
@@ -527,29 +549,11 @@ int main(int argc, const char * argv[]) {
 			vulkan.CmdEndRenderPass();
 			
 			// compute commands recorded with a pipeline image memory barrier
-			/*
-			 - begin compute command buffer
-			 - 'VkImageMemoryBarrier imageMemoryBarrier = {};
-						 imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-						 // We won't be changing the layout of the image
-						 imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-						 imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-						 imageMemoryBarrier.image = textureComputeTarget.image;
-						 imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-						 imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-						 imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-						 imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-						 imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-						 vkCmdPipelineBarrier(
-							 drawCmdBuffers[i],
-							 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-							 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-							 VK_FLAGS_NONE,
-							 0, nullptr,
-							 0, nullptr,
-							 1, &imageMemoryBarrier);'
-			 - submit to compute queue
-			 */
+			// begin compute command buffer
+			vulkan.BeginCompute();
+			vulkan.CmdPipelineImageMemoryBarrier(true, finalColourImageIndex, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
+			// submit to compute queue
+			vulkan.EndCompute();
 			
 			
 			// final render pass recorded with a pipeline buffer memory barrier:
