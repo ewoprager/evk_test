@@ -358,14 +358,23 @@ void RenderHUD(){
 	vulkanPtr->CmdDrawIndexed(vulkanPtr->GetIndexBufferCount(Globals::HUD::IBIndexOffset));
 }
 
+struct CallbackReceiver {
+	CallbackReceiver(EVK::Interface &_ir) : ir(_ir) {}
+	
+	void ResizeCallback(SDL_Event event){
+		ir.FramebufferResizeCallback();
+	}
+	
+private:;
+	EVK::Interface &ir;
+};
+
 int main(int argc, const char * argv[]) {
 	SDL_Init(SDL_INIT_EVERYTHING);
 	
 	SDL_SetRelativeMouseMode(SDL_TRUE);
 	
 	ESDL::InitEventHandler();
-	
-	IMG_Init(IMG_INIT_PNG);
 	
 	SDL_Window *window = SDL_CreateWindow("VulkanFirst", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1024, 768, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_FULLSCREEN_DESKTOP);
 	
@@ -468,6 +477,12 @@ int main(int argc, const char * argv[]) {
 	EVK::Interface vulkan = NewBuildPipelines(devices, imageBlueprintPtrs, shadowImageIndex, skyboxImageIndex, finalColourImageIndex, finalDepthImageIndex);
 	vulkanPtr = &vulkan;
 	
+	CallbackReceiver cr {vulkan};
+	SDL_Event event;
+	event.type = SDL_WINDOWEVENT;
+	event.window.event = SDL_WINDOWEVENT_SIZE_CHANGED;
+	ESDL::AddEventCallback((MemberFunction<CallbackReceiver, void, SDL_Event>){&cr, &CallbackReceiver::ResizeCallback}, event);
+	
 	vulkan.FillVertexBuffer(Globals::HUD::vertexVBIndexOffset, (void *)hudVertices, sizeof(hudVertices));
 	vulkan.FillIndexBuffer(Globals::HUD::IBIndexOffset, (uint32_t *)hudIndices, hudIndicesN);
 	
@@ -557,7 +572,7 @@ int main(int argc, const char * argv[]) {
 			
 			
 			// final render pass recorded with a pipeline buffer memory barrier:
-			vulkan.BeginFinalRenderPass(); // begin with a pipeline buffer memory barrier
+			vulkan.BeginFinalRenderPass({{1.0f, 1.0f, 1.0f, 1.0f}}); // begin with a pipeline buffer memory barrier
 			
 			vulkan.GP((int)GraphicsPipeline::finall).Bind();
 			vulkan.GP((int)GraphicsPipeline::finall).BindDescriptorSets(0, 1);
@@ -569,7 +584,6 @@ int main(int argc, const char * argv[]) {
 			vulkan.EndFinalRenderPassAndFrame();
 		}
 	}
-	vkDeviceWaitIdle(vulkan.GetLogicalDevice());
 	
 	SDL_DestroyWindow(window);
 	

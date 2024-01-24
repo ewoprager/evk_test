@@ -7,6 +7,7 @@
 #include <mattresses.h>
 #include <ESDL/ESDL_General.h>
 #include <ESDL/ESDL_EventHandler.h>
+#include <SDL2/SDL_vulkan.h>
 #include <evk/Base.hpp>
 
 #include <ReadProcessedObj.hpp>
