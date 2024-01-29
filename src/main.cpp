@@ -88,8 +88,9 @@ static const uint32_t skyboxIndices[skyboxIndicesN] = {
 };
 
 
-
-EVK::Interface *vulkanPtr=nullptr;
+// devices declared first as we need it to be destroyed last
+std::shared_ptr<EVK::Devices> devices {};
+std::shared_ptr<EVK::Interface> vulkan {};
 
 std::vector<std::shared_ptr<EVK::IImageBlueprint>> imageBlueprintPtrs {};
 
@@ -275,11 +276,11 @@ Player *player;
 void Update(float dT, Shared_Main::PushConstants_Vert &vertPcs, Shared_Main::PushConstants_Frag &fragPcs, Shared_Shadow::PushConstants_Vert &shadPcs){
 	
 	// UBOs
-	Shared_Main::UBO_Global *const uboGlobalPointer = vulkanPtr->GetUniformBufferObjectPointer<Shared_Main::UBO_Global>((int)UBO::mainGlobal/*sharedMainGlobalUboIndex*/);
-	std::vector<Shared_Main::PerObject *> uboPerObjectPointers = vulkanPtr->GetUniformBufferObjectPointers<Shared_Main::PerObject>((int)UBO::mainPerObject/*mainOncePerObjectUboIndex*/);
-	Shared_Shadow::UBO_Global *const uboShadowPointer = vulkanPtr->GetUniformBufferObjectPointer<Shared_Shadow::UBO_Global>((int)UBO::shadow/*sharedShadowGlobalUboIndex*/);
-	Pipeline_Skybox::UBO_Global *const uboSkyboxPointer = vulkanPtr->GetUniformBufferObjectPointer<Pipeline_Skybox::UBO_Global>((int)UBO::skybox/*skyboxGlobalUboIndex*/);
-	Pipeline_Hud::UBO *const uboHudPointer = vulkanPtr->GetUniformBufferObjectPointer<Pipeline_Hud::UBO>((int)UBO::hud/*hudUboIndex*/);
+	Shared_Main::UBO_Global *const uboGlobalPointer = vulkan->GetUniformBufferObjectPointer<Shared_Main::UBO_Global>((int)UBO::mainGlobal/*sharedMainGlobalUboIndex*/);
+	std::vector<Shared_Main::PerObject *> uboPerObjectPointers = vulkan->GetUniformBufferObjectPointers<Shared_Main::PerObject>((int)UBO::mainPerObject/*mainOncePerObjectUboIndex*/);
+	Shared_Shadow::UBO_Global *const uboShadowPointer = vulkan->GetUniformBufferObjectPointer<Shared_Shadow::UBO_Global>((int)UBO::shadow/*sharedShadowGlobalUboIndex*/);
+	Pipeline_Skybox::UBO_Global *const uboSkyboxPointer = vulkan->GetUniformBufferObjectPointer<Pipeline_Skybox::UBO_Global>((int)UBO::skybox/*skyboxGlobalUboIndex*/);
+	Pipeline_Hud::UBO *const uboHudPointer = vulkan->GetUniformBufferObjectPointer<Pipeline_Hud::UBO>((int)UBO::hud/*hudUboIndex*/);
 	
 	// Updating
 	for(int i=0; i<Globals::MainInstanced::renderedN; i++) renderedInstanced[i]->Update(dT);
@@ -287,9 +288,9 @@ void Update(float dT, Shared_Main::PushConstants_Vert &vertPcs, Shared_Main::Pus
 	
 	// Setting main global UBO
 	uboGlobalPointer->viewInv = player->GetViewInverseMatrix();
-	uboGlobalPointer->proj = mat<4, 4>::PerspectiveProjection(M_PI*0.25f, (float)vulkanPtr->GetExtentWidth()/(float)vulkanPtr->GetExtentHeight(), Globals::cameraZNear, Globals::cameraZFar);
+	uboGlobalPointer->proj = mat<4, 4>::PerspectiveProjection(M_PI*0.25f, (float)vulkan->GetExtentWidth()/(float)vulkan->GetExtentHeight(), Globals::cameraZNear, Globals::cameraZFar);
 	uboGlobalPointer->proj[1][1] *= -1.0f;
-	uboGlobalPointer->lightDir = Globals::lightDirection | 0.0f; // should do lhs.xyz = rhs
+	uboGlobalPointer->lightDir.xyz_r() = Globals::lightDirection;
 	const vec<4> sunColour = {0.9882352941f, 0.8980392157f, 0.4392156863f, 1.0f};
 	uboGlobalPointer->lightColour = sunColour;
 	uboGlobalPointer->cameraPosition = player->GetCameraPosition() | 1.0f;
@@ -315,58 +316,58 @@ void Update(float dT, Shared_Main::PushConstants_Vert &vertPcs, Shared_Main::Pus
 	fragPcs.specularFactor = 0.05f;
 	
 	// Setting HUD UBO
-	*uboHudPointer = {(float32_t)vulkanPtr->GetExtentWidth(), (float32_t)vulkanPtr->GetExtentHeight(), 30.0f};
+	*uboHudPointer = {(float32_t)vulkan->GetExtentWidth(), (float32_t)vulkan->GetExtentHeight(), 30.0f};
 }
 
 void RenderShadowMap(Shared_Shadow::PushConstants_Vert shadPcs, const int &cascadeLayer){
 	shadPcs.cascadeLayer = cascadeLayer;
 	
-	vulkanPtr->GP((int)GraphicsPipeline::shadowInstanced).Bind();
-	vulkanPtr->GP((int)GraphicsPipeline::shadowInstanced).BindDescriptorSets(0, Pipeline_ShadowInstanced::descriptorSetsN); // has no descriptor sets
-	vulkanPtr->GP((int)GraphicsPipeline::shadowInstanced).CmdPushConstants<Shared_Shadow::PushConstants_Vert>(0, &shadPcs);
+	vulkan->GP((int)GraphicsPipeline::shadowInstanced).Bind();
+	vulkan->GP((int)GraphicsPipeline::shadowInstanced).BindDescriptorSets(0, Pipeline_ShadowInstanced::descriptorSetsN); // has no descriptor sets
+	vulkan->GP((int)GraphicsPipeline::shadowInstanced).CmdPushConstants<Shared_Shadow::PushConstants_Vert>(0, &shadPcs);
 	for(int i=0; i<Globals::MainInstanced::renderedN; i++) renderedInstanced[i]->Render(GraphicsPipeline::shadowInstanced, nullptr, nullptr, &shadPcs);
 	
-	vulkanPtr->GP((int)GraphicsPipeline::shadowOnce).Bind();
-	vulkanPtr->GP((int)GraphicsPipeline::shadowOnce).CmdPushConstants<Shared_Shadow::PushConstants_Vert>(0, &shadPcs);
+	vulkan->GP((int)GraphicsPipeline::shadowOnce).Bind();
+	vulkan->GP((int)GraphicsPipeline::shadowOnce).CmdPushConstants<Shared_Shadow::PushConstants_Vert>(0, &shadPcs);
 	std::vector<int> indices(Pipeline_MainOnce::dynamicOffsetsN);
 	for(int i=0; i<Globals::MainOnce::renderedN; i++){
 		indices[0] = i;
-		vulkanPtr->GP((int)GraphicsPipeline::shadowOnce).BindDescriptorSets(0, Pipeline_ShadowOnce::descriptorSetsN, indices);
+		vulkan->GP((int)GraphicsPipeline::shadowOnce).BindDescriptorSets(0, Pipeline_ShadowOnce::descriptorSetsN, indices);
 		renderedOnce[i]->Render(GraphicsPipeline::shadowOnce, nullptr, nullptr, &shadPcs);
 	}
 }
 
 void RenderScene(Shared_Main::PushConstants_Vert vertPcs, Shared_Main::PushConstants_Frag fragPcs){
-	vulkanPtr->GP((int)GraphicsPipeline::mainInstanced).Bind();
-	vulkanPtr->GP((int)GraphicsPipeline::mainInstanced).BindDescriptorSets(0, Pipeline_MainInstanced::descriptorSetsN);
+	vulkan->GP((int)GraphicsPipeline::mainInstanced).Bind();
+	vulkan->GP((int)GraphicsPipeline::mainInstanced).BindDescriptorSets(0, Pipeline_MainInstanced::descriptorSetsN);
 	for(int i=0; i<Globals::MainInstanced::renderedN; i++) renderedInstanced[i]->Render(GraphicsPipeline::mainInstanced, &vertPcs, &fragPcs, nullptr);
 	
-	vulkanPtr->GP((int)GraphicsPipeline::mainOnce).Bind();
+	vulkan->GP((int)GraphicsPipeline::mainOnce).Bind();
 	std::vector<int> indices(Pipeline_MainOnce::dynamicOffsetsN);
 	for(int i=0; i<Globals::MainOnce::renderedN; i++){
 		indices[0] = i;
-		vulkanPtr->GP((int)GraphicsPipeline::mainOnce).BindDescriptorSets(0, Pipeline_MainOnce::descriptorSetsN, indices);
+		vulkan->GP((int)GraphicsPipeline::mainOnce).BindDescriptorSets(0, Pipeline_MainOnce::descriptorSetsN, indices);
 		renderedOnce[i]->Render(GraphicsPipeline::mainOnce, &vertPcs, &fragPcs, nullptr);
 	}
 }
 
 void RenderHUD(){
-	vulkanPtr->GP((int)GraphicsPipeline::hud).Bind();
-	vulkanPtr->GP((int)GraphicsPipeline::hud).BindDescriptorSets(0, Pipeline_Hud::descriptorSetsN);
-	vulkanPtr->CmdBindVertexBuffer(0, Globals::HUD::vertexVBIndexOffset);
-	vulkanPtr->CmdBindIndexBuffer(Globals::HUD::IBIndexOffset, VK_INDEX_TYPE_UINT32);
-	vulkanPtr->CmdDrawIndexed(vulkanPtr->GetIndexBufferCount(Globals::HUD::IBIndexOffset));
+	vulkan->GP((int)GraphicsPipeline::hud).Bind();
+	vulkan->GP((int)GraphicsPipeline::hud).BindDescriptorSets(0, Pipeline_Hud::descriptorSetsN);
+	vulkan->CmdBindVertexBuffer(0, Globals::HUD::vertexVBIndexOffset);
+	vulkan->CmdBindIndexBuffer(Globals::HUD::IBIndexOffset, VK_INDEX_TYPE_UINT32);
+	vulkan->CmdDrawIndexed(vulkan->GetIndexBufferCount(Globals::HUD::IBIndexOffset));
 }
 
 struct CallbackReceiver {
-	CallbackReceiver(EVK::Interface &_ir) : ir(_ir) {}
+	CallbackReceiver(std::shared_ptr<EVK::Interface> _ir) : ir(_ir) {}
 	
 	void ResizeCallback(SDL_Event event){
-		ir.FramebufferResizeCallback();
+		ir->FramebufferResizeCallback();
 	}
 	
 private:;
-	EVK::Interface &ir;
+	std::shared_ptr<EVK::Interface> ir;
 };
 
 int main(int argc, const char * argv[]) {
@@ -382,7 +383,7 @@ int main(int argc, const char * argv[]) {
 	SDL_Vulkan_GetInstanceExtensions(window, &requiredExtensionCount, nullptr);
 	std::vector<const char *> requiredExtensions(requiredExtensionCount);
 	SDL_Vulkan_GetInstanceExtensions(window, &requiredExtensionCount, requiredExtensions.data());
-	EVK::Devices devices = EVK::Devices("VulkanFirst", requiredExtensions,
+	devices = std::make_shared<EVK::Devices>("VulkanFirst", requiredExtensions,
 										[window](VkInstance instance) -> VkSurfaceKHR {
 		VkSurfaceKHR ret;
 		if(SDL_Vulkan_CreateSurface(window, instance, &ret) == SDL_FALSE)
@@ -461,7 +462,7 @@ int main(int argc, const char * argv[]) {
 		finalColourImageIndex = imageBlueprintPtrs.size();
 		imageBlueprintPtrs.push_back(std::make_shared<EVK::ManualImageBlueprint>(imageCI, VK_IMAGE_VIEW_TYPE_2D, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_COLOR_BIT));
 		
-		imageCI.format = devices.FindDepthFormat();
+		imageCI.format = devices->FindDepthFormat();
 		imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		finalDepthImageIndex = imageBlueprintPtrs.size();
 		imageBlueprintPtrs.push_back(std::make_shared<EVK::ManualImageBlueprint>(imageCI, VK_IMAGE_VIEW_TYPE_2D, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT));
@@ -474,8 +475,7 @@ int main(int argc, const char * argv[]) {
 	objDatas[(int)ObjData::plane] = planeData;
 	
 	
-	EVK::Interface vulkan = NewBuildPipelines(devices, imageBlueprintPtrs, shadowImageIndex, skyboxImageIndex, finalColourImageIndex, finalDepthImageIndex);
-	vulkanPtr = &vulkan;
+	vulkan = NewBuildPipelines(*devices, imageBlueprintPtrs, shadowImageIndex, skyboxImageIndex, finalColourImageIndex, finalDepthImageIndex);
 	
 	CallbackReceiver cr {vulkan};
 	SDL_Event event;
@@ -483,14 +483,14 @@ int main(int argc, const char * argv[]) {
 	event.window.event = SDL_WINDOWEVENT_SIZE_CHANGED;
 	ESDL::AddEventCallback((MemberFunction<CallbackReceiver, void, SDL_Event>){&cr, &CallbackReceiver::ResizeCallback}, event);
 	
-	vulkan.FillVertexBuffer(Globals::HUD::vertexVBIndexOffset, (void *)hudVertices, sizeof(hudVertices));
-	vulkan.FillIndexBuffer(Globals::HUD::IBIndexOffset, (uint32_t *)hudIndices, hudIndicesN);
+	vulkan->FillVertexBuffer(Globals::HUD::vertexVBIndexOffset, (void *)hudVertices, sizeof(hudVertices));
+	vulkan->FillIndexBuffer(Globals::HUD::IBIndexOffset, (uint32_t *)hudIndices, hudIndicesN);
 	
-	vulkan.FillVertexBuffer(Globals::Skybox::vertexVBIndexOffset, (void *)skyboxVertices, sizeof(skyboxVertices));
-	vulkan.FillIndexBuffer(Globals::Skybox::IBIndexOffset, (uint32_t *)skyboxIndices, skyboxIndicesN);
+	vulkan->FillVertexBuffer(Globals::Skybox::vertexVBIndexOffset, (void *)skyboxVertices, sizeof(skyboxVertices));
+	vulkan->FillIndexBuffer(Globals::Skybox::IBIndexOffset, (uint32_t *)skyboxIndices, skyboxIndicesN);
 	
-	vulkan.FillVertexBuffer(Globals::Finall::vertexVBIndexOffset, (void *)finalVertices, sizeof(finalVertices));
-	vulkan.FillIndexBuffer(Globals::Finall::IBIndexOffset, (uint32_t *)finalIndices, finalIndicesN);
+	vulkan->FillVertexBuffer(Globals::Finall::vertexVBIndexOffset, (void *)finalVertices, sizeof(finalVertices));
+	vulkan->FillIndexBuffer(Globals::Finall::IBIndexOffset, (uint32_t *)finalIndices, finalIndicesN);
 	
 	ChairInstanceManager *chairManager;
 	ChairInstance *chair;
@@ -527,61 +527,61 @@ int main(int argc, const char * argv[]) {
 		
 		Update(dT, vertPcs, fragPcs, shadPcs);
 		
-		if(vulkan.BeginFrame()){
+		if(vulkan->BeginFrame()){
 			for(int i=0; i<SHADOW_MAP_CASCADE_COUNT; i++){
-				vulkan.CmdBeginLayeredBufferedRenderPass(0, VK_SUBPASS_CONTENTS_INLINE, {clearVals[1]}, i);
-				//vulkan.CmdSetDepthBias(1.25f, 0.0f, 1.75f); // 1.25, 0.0, 1.75
+				vulkan->CmdBeginLayeredBufferedRenderPass(0, VK_SUBPASS_CONTENTS_INLINE, {clearVals[1]}, i);
+				//vulkan->CmdSetDepthBias(1.25f, 0.0f, 1.75f); // 1.25, 0.0, 1.75
 				RenderShadowMap(shadPcs, i);
-				vulkan.CmdEndRenderPass();
+				vulkan->CmdEndRenderPass();
 			}
 			
 			/*
-			vulkan.BeginFinalRenderPass();
+			vulkan->BeginFinalRenderPass();
 			
-			vulkan.GP((int)GraphicsPipeline::skybox).Bind();
-			vulkan.GP((int)GraphicsPipeline::skybox).BindDescriptorSets(0, Pipeline_Skybox::descriptorSetsN);
-			vulkan.CmdBindVertexBuffer(0, Globals::Skybox::vertexVBIndexOffset);
-			vulkan.CmdBindIndexBuffer(Globals::Skybox::IBIndexOffset, VK_INDEX_TYPE_UINT32);
-			vulkan.CmdDrawIndexed(vulkan.GetIndexBufferCount(Globals::Skybox::IBIndexOffset));
+			vulkan->GP((int)GraphicsPipeline::skybox).Bind();
+			vulkan->GP((int)GraphicsPipeline::skybox).BindDescriptorSets(0, Pipeline_Skybox::descriptorSetsN);
+			vulkan->CmdBindVertexBuffer(0, Globals::Skybox::vertexVBIndexOffset);
+			vulkan->CmdBindIndexBuffer(Globals::Skybox::IBIndexOffset, VK_INDEX_TYPE_UINT32);
+			vulkan->CmdDrawIndexed(vulkan->GetIndexBufferCount(Globals::Skybox::IBIndexOffset));
 			
 			RenderScene(vertPcs, fragPcs);
 			
 			RenderHUD();
 			 */
 			
-			vulkan.CmdBeginBufferedRenderPass(0, VK_SUBPASS_CONTENTS_INLINE, clearVals);
+			vulkan->CmdBeginBufferedRenderPass(0, VK_SUBPASS_CONTENTS_INLINE, clearVals);
 			
-			vulkan.GP((int)GraphicsPipeline::skybox).Bind();
-			vulkan.GP((int)GraphicsPipeline::skybox).BindDescriptorSets(0, Pipeline_Skybox::descriptorSetsN);
-			vulkan.CmdBindVertexBuffer(0, Globals::Skybox::vertexVBIndexOffset);
-			vulkan.CmdBindIndexBuffer(Globals::Skybox::IBIndexOffset, VK_INDEX_TYPE_UINT32);
-			vulkan.CmdDrawIndexed(vulkan.GetIndexBufferCount(Globals::Skybox::IBIndexOffset));
+			vulkan->GP((int)GraphicsPipeline::skybox).Bind();
+			vulkan->GP((int)GraphicsPipeline::skybox).BindDescriptorSets(0, Pipeline_Skybox::descriptorSetsN);
+			vulkan->CmdBindVertexBuffer(0, Globals::Skybox::vertexVBIndexOffset);
+			vulkan->CmdBindIndexBuffer(Globals::Skybox::IBIndexOffset, VK_INDEX_TYPE_UINT32);
+			vulkan->CmdDrawIndexed(vulkan->GetIndexBufferCount(Globals::Skybox::IBIndexOffset));
 			
 			RenderScene(vertPcs, fragPcs);
 			
 			RenderHUD();
 			
-			vulkan.CmdEndRenderPass();
+			vulkan->CmdEndRenderPass();
 			
 			// compute commands recorded with a pipeline image memory barrier
 			// begin compute command buffer
-			vulkan.BeginCompute();
-			vulkan.CmdPipelineImageMemoryBarrier(true, finalColourImageIndex, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
+			vulkan->BeginCompute();
+			vulkan->CmdPipelineImageMemoryBarrier(true, finalColourImageIndex, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
 			// submit to compute queue
-			vulkan.EndCompute();
+			vulkan->EndCompute();
 			
 			
 			// final render pass recorded with a pipeline buffer memory barrier:
-			vulkan.BeginFinalRenderPass({{1.0f, 1.0f, 1.0f, 1.0f}}); // begin with a pipeline buffer memory barrier
+			vulkan->BeginFinalRenderPass({{1.0f, 1.0f, 1.0f, 1.0f}}); // begin with a pipeline buffer memory barrier
 			
-			vulkan.GP((int)GraphicsPipeline::finall).Bind();
-			vulkan.GP((int)GraphicsPipeline::finall).BindDescriptorSets(0, 1);
-			vulkan.CmdBindVertexBuffer(0, Globals::Finall::vertexVBIndexOffset);
-			vulkan.CmdBindIndexBuffer(Globals::Finall::IBIndexOffset, VK_INDEX_TYPE_UINT32);
-			vulkan.CmdDrawIndexed(vulkan.GetIndexBufferCount(Globals::Finall::IBIndexOffset));
+			vulkan->GP((int)GraphicsPipeline::finall).Bind();
+			vulkan->GP((int)GraphicsPipeline::finall).BindDescriptorSets(0, 1);
+			vulkan->CmdBindVertexBuffer(0, Globals::Finall::vertexVBIndexOffset);
+			vulkan->CmdBindIndexBuffer(Globals::Finall::IBIndexOffset, VK_INDEX_TYPE_UINT32);
+			vulkan->CmdDrawIndexed(vulkan->GetIndexBufferCount(Globals::Finall::IBIndexOffset));
 			
 			//
-			vulkan.EndFinalRenderPassAndFrame();
+			vulkan->EndFinalRenderPassAndFrame();
 		}
 	}
 	

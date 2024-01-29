@@ -2,7 +2,7 @@
 
 extern std::vector<int> textureImageIndexArray;
 
-EVK::Interface NewBuildPipelines(const EVK::Devices &devices, const std::vector<std::shared_ptr<EVK::IImageBlueprint>> &imageBlueprintPtrs, int shadowMapImageIndex, int skyboxImageIndex, int finalColourImageIndex, int finalDepthImageIndex){
+std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, const std::vector<std::shared_ptr<EVK::IImageBlueprint>> &imageBlueprintPtrs, int shadowMapImageIndex, int skyboxImageIndex, int finalColourImageIndex, int finalDepthImageIndex){
 	
 	VkPipelineRasterizationStateCreateInfo rasterizer{};
 	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -696,5 +696,5 @@ EVK::Interface NewBuildPipelines(const EVK::Devices &devices, const std::vector<
 	nvi.indexBuffersN = Globals::indexBuffersN;
 	nvi.imageBlueprintPtrs = imageBlueprintPtrs;
 	
-	return EVK::Interface(nvi);
+	return std::make_shared<EVK::Interface>(nvi);
 }
