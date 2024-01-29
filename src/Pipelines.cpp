@@ -459,9 +459,7 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, c
 	};
 	
 	
-	EVK::InterfaceBlueprint nvi = {
-		.devices = devices
-	};
+	EVK::InterfaceBlueprint nvi {devices};
 	
 	std::vector<EVK::GraphicsPipelineBlueprint> pbs(GRAPHICS_PIPELINES_N);
 	pbs[(int)GraphicsPipeline::mainInstanced] = pbMainInstanced;
