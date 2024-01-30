@@ -2,8 +2,70 @@
 
 extern std::vector<int> textureImageIndexArray;
 
-std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, const std::vector<std::shared_ptr<EVK::IImageBlueprint>> &imageBlueprintPtrs, int shadowMapImageIndex, int skyboxImageIndex, int finalColourImageIndex, int finalDepthImageIndex){
+std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices){
+	EVK::InterfaceBlueprint nvi {devices};
 	
+	nvi.graphicsPipelinesN = GRAPHICS_PIPELINES_N;
+	
+	nvi.computePipelinesN = 1;
+	
+	nvi.uniformBufferObjectsN = 6;
+	
+	// !!! no idea if the bit masks are correct for this
+	nvi.storageBufferObjectsN = 1;
+	
+	nvi.samplerBlueprints = std::vector<VkSamplerCreateInfo>(SAMPLERS_N);
+	VkSamplerCreateInfo samplerInfo{
+		.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+		.magFilter = VK_FILTER_LINEAR,
+		.minFilter = VK_FILTER_LINEAR,
+		.addressModeU = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
+		.addressModeV = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
+		.addressModeW = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
+		.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+		.anisotropyEnable = VK_TRUE,
+		.maxAnisotropy = devices.GetPhysicalDeviceProperties().limits.maxSamplerAnisotropy,
+		.unnormalizedCoordinates = VK_FALSE, // 'VK_TRUE' would mean texture coordinates are (0, texWidth), (0, texHeight)
+		.compareEnable = VK_FALSE,
+		.compareOp = VK_COMPARE_OP_ALWAYS,
+		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.mipLodBias = 0.0f, // Optional
+		.minLod = 0.0f, // Optional
+		.maxLod = 20.0f // max level of detail (miplevels)
+	};
+	nvi.samplerBlueprints[(int)Sampler::main] = samplerInfo;
+	
+	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.maxAnisotropy = 1.0f;
+	samplerInfo.compareEnable = VK_FALSE;
+	samplerInfo.compareOp = VK_COMPARE_OP_NEVER;
+	nvi.samplerBlueprints[(int)Sampler::cube] = samplerInfo;
+	
+	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	samplerInfo.maxLod = 1.0f;
+	samplerInfo.compareEnable = VK_FALSE;
+	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	const VkFilter shadowmap_filter = (devices.GetFormatProperties(DEPTH_FORMAT).optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+	samplerInfo.magFilter = shadowmap_filter;
+	samplerInfo.minFilter = shadowmap_filter;
+	nvi.samplerBlueprints[(int)Sampler::shadow] = samplerInfo;
+	
+	nvi.layeredBufferedRenderPassesN = 1;
+	
+	nvi.bufferedRenderPassesN = 1;
+	
+	nvi.vertexBuffersN = Globals::vertexBuffersN;
+	nvi.indexBuffersN = Globals::indexBuffersN;
+	nvi.imagesN = SKY_BOXES_N + SHADOW_MAPS_N + FINAL_IMAGES_N + PNGS_N;
+	
+	return std::make_shared<EVK::Interface>(nvi);
+}
+
+void BuildVkInterfaceStructures(std::shared_ptr<EVK::Interface> interface, int shadowMapImageIndex, int skyboxImageIndex, int finalColourImageIndex, int finalDepthImageIndex){
 	VkPipelineRasterizationStateCreateInfo rasterizer{};
 	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	rasterizer.depthClampEnable = VK_FALSE;
@@ -202,8 +264,8 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, c
 	
 	// main instanced
 	std::vector<VkPipelineShaderStageCreateInfo> mainInstancedShaderStages = shaderStages;
-	mainInstancedShaderStages[0].module = devices.CreateShaderModule("../Resources/Shaders/vertMainInstanced.spv");
-	mainInstancedShaderStages[1].module = devices.CreateShaderModule("../Resources/Shaders/fragMain.spv");
+	mainInstancedShaderStages[0].module = interface->devices.CreateShaderModule("../Resources/Shaders/vertMainInstanced.spv");
+	mainInstancedShaderStages[1].module = interface->devices.CreateShaderModule("../Resources/Shaders/fragMain.spv");
 	vertexInputInfo = Pipeline_MainInstanced::Attributes::stateCI;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
 	rasterizer.depthBiasEnable = VK_FALSE;
@@ -211,7 +273,7 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, c
 	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 	dynamicState.dynamicStateCount = 2;
 #ifdef MSAA
-	multisampling.rasterizationSamples = devices.GetMSAASamples();
+	multisampling.rasterizationSamples = interface->devices.GetMSAASamples();
 #else
 	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 #endif
@@ -234,7 +296,7 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, c
 	
 	// shadow instanced
 	VkPipelineShaderStageCreateInfo shadowInstancedShaderStage = shaderStages[0];
-	shadowInstancedShaderStage.module = devices.CreateShaderModule("../Resources/Shaders/vertShadowInstanced.spv");
+	shadowInstancedShaderStage.module = interface->devices.CreateShaderModule("../Resources/Shaders/vertShadowInstanced.spv");
 	rasterizer.cullMode = VK_CULL_MODE_NONE;
 	rasterizer.depthBiasEnable = VK_TRUE;
 	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -261,13 +323,13 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, c
 	
 	// main once
 	std::vector<VkPipelineShaderStageCreateInfo> mainOnceShaderStages = shaderStages;
-	mainOnceShaderStages[0].module = devices.CreateShaderModule("../Resources/Shaders/vertMainOnce.spv");
-	mainOnceShaderStages[1].module = devices.CreateShaderModule("../Resources/Shaders/fragMain.spv");
+	mainOnceShaderStages[0].module = interface->devices.CreateShaderModule("../Resources/Shaders/vertMainOnce.spv");
+	mainOnceShaderStages[1].module = interface->devices.CreateShaderModule("../Resources/Shaders/fragMain.spv");
 	vertexInputInfo = Pipeline_MainOnce::Attributes::stateCI;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
 	rasterizer.depthBiasEnable = VK_FALSE;
 #ifdef MSAA
-	multisampling.rasterizationSamples = devices.GetMSAASamples();
+	multisampling.rasterizationSamples = interface->devices.GetMSAASamples();
 #else
 	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 #endif
@@ -296,7 +358,7 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, c
 	
 	// shadow once
 	VkPipelineShaderStageCreateInfo shadowOnceShaderStage = shaderStages[0];
-	shadowOnceShaderStage.module = devices.CreateShaderModule("../Resources/Shaders/vertShadowOnce.spv");
+	shadowOnceShaderStage.module = interface->devices.CreateShaderModule("../Resources/Shaders/vertShadowOnce.spv");
 	rasterizer.cullMode = VK_CULL_MODE_NONE;
 	rasterizer.depthBiasEnable = VK_TRUE;
 	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -347,13 +409,13 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, c
 		}
 	};
 	std::vector<VkPipelineShaderStageCreateInfo> hudShaderStages = shaderStages;
-	hudShaderStages[0].module = devices.CreateShaderModule("../Resources/Shaders/vertHud.spv");
-	hudShaderStages[1].module = devices.CreateShaderModule("../Resources/Shaders/fragHud.spv");
+	hudShaderStages[0].module = interface->devices.CreateShaderModule("../Resources/Shaders/vertHud.spv");
+	hudShaderStages[1].module = interface->devices.CreateShaderModule("../Resources/Shaders/fragHud.spv");
 	vertexInputInfo = Pipeline_Hud::Attributes::stateCI;
 	rasterizer.cullMode = VK_CULL_MODE_NONE;
 	rasterizer.depthBiasEnable = VK_FALSE;
 #ifdef MSAA
-	multisampling.rasterizationSamples = devices.GetMSAASamples();
+	multisampling.rasterizationSamples = interface->devices.GetMSAASamples();
 #else
 	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 #endif
@@ -395,8 +457,8 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, c
 		}
 	};
 	std::vector<VkPipelineShaderStageCreateInfo> skyboxShaderStages = shaderStages;
-	skyboxShaderStages[0].module = devices.CreateShaderModule("../Resources/Shaders/vertSkybox.spv");
-	skyboxShaderStages[1].module = devices.CreateShaderModule("../Resources/Shaders/fragSkybox.spv");
+	skyboxShaderStages[0].module = interface->devices.CreateShaderModule("../Resources/Shaders/vertSkybox.spv");
+	skyboxShaderStages[1].module = interface->devices.CreateShaderModule("../Resources/Shaders/fragSkybox.spv");
 	vertexInputInfo = Pipeline_Skybox::Attributes::stateCI;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
 	depthStencil.depthTestEnable = VK_FALSE;
@@ -428,13 +490,13 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, c
 		}
 	};
 	std::vector<VkPipelineShaderStageCreateInfo> finalShaderStages = shaderStages;
-	finalShaderStages[0].module = devices.CreateShaderModule("../Resources/Shaders/vertFinal.spv");
-	finalShaderStages[1].module = devices.CreateShaderModule("../Resources/Shaders/fragFinal.spv");
+	finalShaderStages[0].module = interface->devices.CreateShaderModule("../Resources/Shaders/vertFinal.spv");
+	finalShaderStages[1].module = interface->devices.CreateShaderModule("../Resources/Shaders/fragFinal.spv");
 	vertexInputInfo = Pipeline_Final::Attributes::stateCI;
 	rasterizer.cullMode = VK_CULL_MODE_NONE;
 	rasterizer.depthBiasEnable = VK_FALSE;
 #ifdef MSAA
-	multisampling.rasterizationSamples = devices.GetMSAASamples();
+	multisampling.rasterizationSamples = interface->devices.GetMSAASamples();
 #else
 	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 #endif
@@ -457,19 +519,7 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, c
 			.bufferedRenderPassIndex = {},
 			.layeredBufferedRenderPassIndex = {}
 	};
-	
-	
-	EVK::InterfaceBlueprint nvi {devices};
-	
-	std::vector<EVK::GraphicsPipelineBlueprint> pbs(GRAPHICS_PIPELINES_N);
-	pbs[(int)GraphicsPipeline::mainInstanced] = pbMainInstanced;
-	pbs[(int)GraphicsPipeline::mainOnce] = pbMainOnce;
-	pbs[(int)GraphicsPipeline::shadowInstanced] = pbShadowInstanced;
-	pbs[(int)GraphicsPipeline::shadowOnce] = pbShadowOnce;
-	pbs[(int)GraphicsPipeline::hud] = pbHud;
-	pbs[(int)GraphicsPipeline::skybox] = pbSkybox;
-	pbs[(int)GraphicsPipeline::finall] = pbFinal;
-	nvi.graphicsPipelineBlueprints = pbs;
+
 	
 	EVK::ComputePipelineBlueprint cb;
 	EVK::DescriptorSetBlueprint histogramDescriptorSetBlueprint = {
@@ -495,60 +545,7 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, c
 	cb.pipelineBlueprint.descriptorSetBlueprints = {histogramDescriptorSetBlueprint};
 	cb.pipelineBlueprint.pushConstantRanges = {};
 	cb.shaderStageCI = shaderStages[0];
-	cb.shaderStageCI.module = devices.CreateShaderModule("../Resources/Shaders/histogram.spv");
-	nvi.computePipelineBlueprints = {cb};
-	
-	nvi.uboBlueprints = {
-		{sizeof(Shared_Main::UBO_Global), {}},
-		{sizeof(Shared_Main::PerObject), {Globals::MainOnce::renderedN}},
-		{sizeof(Pipeline_Hud::UBO), {}},
-		{sizeof(Shared_Shadow::UBO_Global), {}},
-		{sizeof(Pipeline_Skybox::UBO_Global), {}},
-		{sizeof(Pipeline_Histogram::UBO), {}}
-	};
-	
-	// !!! no idea if the bit masks are correct for this
-	nvi.sboBlueprints = {(EVK::StorageBufferObjectBlueprint){sizeof(Pipeline_Histogram::SBO), VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT}};
-	
-	nvi.samplerBlueprints = std::vector<VkSamplerCreateInfo>(SAMPLERS_N);
-	VkSamplerCreateInfo samplerInfo{
-		.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-		.magFilter = VK_FILTER_LINEAR,
-		.minFilter = VK_FILTER_LINEAR,
-		.addressModeU = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
-		.addressModeV = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
-		.addressModeW = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
-		.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-		.anisotropyEnable = VK_TRUE,
-		.maxAnisotropy = devices.GetPhysicalDeviceProperties().limits.maxSamplerAnisotropy,
-		.unnormalizedCoordinates = VK_FALSE, // 'VK_TRUE' would mean texture coordinates are (0, texWidth), (0, texHeight)
-		.compareEnable = VK_FALSE,
-		.compareOp = VK_COMPARE_OP_ALWAYS,
-		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-		.mipLodBias = 0.0f, // Optional
-		.minLod = 0.0f, // Optional
-		.maxLod = 20.0f // max level of detail (miplevels)
-	};
-	nvi.samplerBlueprints[(int)Sampler::main] = samplerInfo;
-	
-	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerInfo.maxAnisotropy = 1.0f;
-	samplerInfo.compareEnable = VK_FALSE;
-	samplerInfo.compareOp = VK_COMPARE_OP_NEVER;
-	nvi.samplerBlueprints[(int)Sampler::cube] = samplerInfo;
-	
-	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-	samplerInfo.maxLod = 1.0f;
-	samplerInfo.compareEnable = VK_FALSE;
-	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-	const VkFilter shadowmap_filter = (devices.GetFormatProperties(DEPTH_FORMAT).optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-	samplerInfo.magFilter = shadowmap_filter;
-	samplerInfo.minFilter = shadowmap_filter;
-	nvi.samplerBlueprints[(int)Sampler::shadow] = samplerInfo;
+	cb.shaderStageCI.module = interface->devices.CreateShaderModule("../Resources/Shaders/histogram.spv");
 	
 	// Creating the shadow mapping render pass
 	VkAttachmentDescription lbAttachmentDescription{
@@ -608,13 +605,12 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, c
 		.imageFormat = DEPTH_FORMAT,
 		.imageAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT
 	};
-	nvi.layeredBufferedRenderPassBlueprints = {lbrpb};
 	
 	// Creating the final render pass
 	static VkAttachmentDescription colourAttachment{
 		.format = FINAL_FORMAT,
 #ifdef MSAA
-		.samples = devices.GetMSAASamples(),
+		.samples = interface->devices.GetMSAASamples(),
 #else
 		.samples = VK_SAMPLE_COUNT_1_BIT,
 #endif
@@ -631,9 +627,9 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, c
 	};
 	
 	static VkAttachmentDescription depthAttachment{
-		.format = devices.FindDepthFormat(),
+		.format = interface->devices.FindDepthFormat(),
 #ifdef MSAA
-		.samples = devices.GetMSAASamples(),
+		.samples = interface->devices.GetMSAASamples(),
 #else
 		.samples = VK_SAMPLE_COUNT_1_BIT,
 #endif
@@ -688,11 +684,29 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices, c
 		.targetTextureImageIndices = {finalColourImageIndex, finalDepthImageIndex},
 		.width = 0, // resises with window
 	};
-	nvi.bufferedRenderPassBlueprints = {brpb};
 	
-	nvi.vertexBuffersN = Globals::vertexBuffersN;
-	nvi.indexBuffersN = Globals::indexBuffersN;
-	nvi.imageBlueprintPtrs = imageBlueprintPtrs;
 	
-	return std::make_shared<EVK::Interface>(nvi);
+	interface->BuildUBO(0, {sizeof(Shared_Main::UBO_Global), {}});
+	interface->BuildUBO(1, {sizeof(Shared_Main::PerObject), {Globals::MainOnce::renderedN}});
+	interface->BuildUBO(2, {sizeof(Pipeline_Hud::UBO), {}});
+	interface->BuildUBO(3, {sizeof(Shared_Shadow::UBO_Global), {}});
+	interface->BuildUBO(4, {sizeof(Pipeline_Skybox::UBO_Global), {}});
+	interface->BuildUBO(5, {sizeof(Pipeline_Histogram::UBO), {}});
+	
+	interface->BuildSBO(0, {(EVK::StorageBufferObjectBlueprint){sizeof(Pipeline_Histogram::SBO), VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT}});
+	
+	interface->BuildBufferedRenderPass(0, brpb);
+	
+	interface->BuildLayeredBufferedRenderPass(0, lbrpb);
+	
+	
+	interface->BuildGraphicsPipeline((int)GraphicsPipeline::mainInstanced, pbMainInstanced);
+	interface->BuildGraphicsPipeline((int)GraphicsPipeline::mainOnce, pbMainOnce);
+	interface->BuildGraphicsPipeline((int)GraphicsPipeline::shadowInstanced, pbShadowInstanced);
+	interface->BuildGraphicsPipeline((int)GraphicsPipeline::shadowOnce, pbShadowOnce);
+	interface->BuildGraphicsPipeline((int)GraphicsPipeline::hud, pbHud);
+	interface->BuildGraphicsPipeline((int)GraphicsPipeline::skybox, pbSkybox);
+	interface->BuildGraphicsPipeline((int)GraphicsPipeline::finall, pbFinal);
+	
+	interface->BuildComputePipeline(0, cb);
 }

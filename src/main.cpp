@@ -92,7 +92,7 @@ static const uint32_t skyboxIndices[skyboxIndicesN] = {
 std::shared_ptr<EVK::Devices> devices {};
 std::shared_ptr<EVK::Interface> vulkan {};
 
-std::vector<std::shared_ptr<EVK::IImageBlueprint>> imageBlueprintPtrs {};
+int imageIndex = 0;
 
 std::map<std::string, uint32_t> materialDictionary = {};
 std::vector<int> textureImageIndexArray(PNGS_N); // a texture ID is the index in this array at which the texture image index (in the `Vulkan` devices.instance) is stored
@@ -109,9 +109,9 @@ uint32_t GetTextureIdFromMtl(const char *usemtl){
 	memcpy(buffer, prefix, prefixLength*sizeof(char));
 	memcpy(buffer + prefixLength, usemtl, nameLength*sizeof(char));
 	memcpy(buffer + prefixLength + nameLength, suffix, suffixLength*sizeof(char));
-	const int imageIndex = imageBlueprintPtrs.size();
-	imageBlueprintPtrs.push_back(std::make_shared<EVK::PNGImageBlueprint>(buffer));
+	vulkan->BuildTextureImageFromFile(imageIndex, {buffer});
 	textureImageIndexArray[textureImageIndexCount] = imageIndex;
+	++imageIndex;
 	materialDictionary[std::string(usemtl)] = textureImageIndexCount;
 	return textureImageIndexCount++;
 }
@@ -399,6 +399,8 @@ int main(int argc, const char * argv[]) {
 		};
 	});
 	
+	vulkan = NewBuildPipelines(*devices);
+	
 	int skyboxImageIndex;
 	{ // preparing skybox
 		std::array<std::string, 6> cubemapFiles = {{
@@ -409,8 +411,8 @@ int main(int argc, const char * argv[]) {
 			"../Resources/textures/skybox_a.png", // correct
 			"../Resources/textures/skybox_c.png" // correct
 		}};
-		skyboxImageIndex = imageBlueprintPtrs.size();
-		imageBlueprintPtrs.push_back(std::make_shared<EVK::CubemapPNGImageBlueprint>(cubemapFiles));
+		skyboxImageIndex = imageIndex;
+		vulkan->BuildCubemapImageFromFiles(imageIndex++, {cubemapFiles});
 	}
 	
 	int shadowImageIndex;
@@ -433,8 +435,8 @@ int main(int argc, const char * argv[]) {
 			.samples = VK_SAMPLE_COUNT_1_BIT,
 			.sharingMode = VK_SHARING_MODE_EXCLUSIVE
 		};
-		shadowImageIndex = imageBlueprintPtrs.size();
-		imageBlueprintPtrs.push_back(std::make_shared<EVK::ManualImageBlueprint>(imageCI, VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT));
+		shadowImageIndex = imageIndex;
+		vulkan->BuildTextureImage(imageIndex++, {imageCI, VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT});
 	}
 	
 	int finalColourImageIndex, finalDepthImageIndex;
@@ -459,13 +461,13 @@ int main(int argc, const char * argv[]) {
 #endif
 			.sharingMode = VK_SHARING_MODE_EXCLUSIVE
 		};
-		finalColourImageIndex = imageBlueprintPtrs.size();
-		imageBlueprintPtrs.push_back(std::make_shared<EVK::ManualImageBlueprint>(imageCI, VK_IMAGE_VIEW_TYPE_2D, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_COLOR_BIT));
+		finalColourImageIndex = imageIndex;
+		vulkan->BuildTextureImage(imageIndex++, {imageCI, VK_IMAGE_VIEW_TYPE_2D, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_COLOR_BIT});
 		
 		imageCI.format = devices->FindDepthFormat();
 		imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		finalDepthImageIndex = imageBlueprintPtrs.size();
-		imageBlueprintPtrs.push_back(std::make_shared<EVK::ManualImageBlueprint>(imageCI, VK_IMAGE_VIEW_TYPE_2D, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT));
+		finalDepthImageIndex = imageIndex;
+		vulkan->BuildTextureImage(imageIndex++, {imageCI, VK_IMAGE_VIEW_TYPE_2D, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT});
 	}
 	
 	objDatas[(int)ObjData::player] = ReadProcessedOBJFile("../Resources/ProcessedObjFiles/MaleLow.bin", &GetTextureIdFromMtl);
@@ -474,8 +476,7 @@ int main(int argc, const char * argv[]) {
 	planeData.divisionData[0].texture = GetTextureIdFromMtl("concrete-917");
 	objDatas[(int)ObjData::plane] = planeData;
 	
-	
-	vulkan = NewBuildPipelines(*devices, imageBlueprintPtrs, shadowImageIndex, skyboxImageIndex, finalColourImageIndex, finalDepthImageIndex);
+	BuildVkInterfaceStructures(vulkan, shadowImageIndex, skyboxImageIndex, finalColourImageIndex, finalDepthImageIndex);
 	
 	CallbackReceiver cr {vulkan};
 	SDL_Event event;
