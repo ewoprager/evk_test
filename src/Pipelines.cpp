@@ -1,7 +1,5 @@
 #include "Pipelines.hpp"
 
-extern std::vector<int> textureImageIndexArray;
-
 std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices){
 	EVK::InterfaceBlueprint nvi {devices};
 	
@@ -60,12 +58,12 @@ std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices){
 	
 	nvi.vertexBuffersN = Globals::vertexBuffersN;
 	nvi.indexBuffersN = Globals::indexBuffersN;
-	nvi.imagesN = SKY_BOXES_N + SHADOW_MAPS_N + FINAL_IMAGES_N + PNGS_N;
+	nvi.imagesN = OTHER_IMAGES_N + PNGS_N;
 	
 	return std::make_shared<EVK::Interface>(nvi);
 }
 
-void BuildVkInterfaceStructures(std::shared_ptr<EVK::Interface> interface, int shadowMapImageIndex, int skyboxImageIndex, int finalColourImageIndex, int finalDepthImageIndex){
+void BuildVkInterfaceStructures(std::shared_ptr<EVK::Interface> interface, std::array<int, PNGS_N> pngsIndexArray){
 	VkPipelineRasterizationStateCreateInfo rasterizer{};
 	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	rasterizer.depthClampEnable = VK_FALSE;
@@ -228,7 +226,7 @@ void BuildVkInterfaceStructures(std::shared_ptr<EVK::Interface> interface, int s
 			.type = EVK::DescriptorType::textureImage,
 			.binding = Shared_Main::textureImagesBinding,
 			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-			.indicesExtra = textureImageIndexArray
+			.indicesExtra = std::vector<int>(pngsIndexArray.begin(), pngsIndexArray.end())
 		},
 		(EVK::DescriptorBlueprint){
 			.type = EVK::DescriptorType::textureSampler,
@@ -240,7 +238,7 @@ void BuildVkInterfaceStructures(std::shared_ptr<EVK::Interface> interface, int s
 			.type = EVK::DescriptorType::combinedImageSampler,
 			.binding = Shared_Main::shadowMapBinding,
 			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-			.indicesExtra = {shadowMapImageIndex},
+			.indicesExtra = {int(OtherImage::shadow_cascades)},
 			.indicesExtra2 = {samplerShadowIndex}
 		}
 	};
@@ -452,7 +450,7 @@ void BuildVkInterfaceStructures(std::shared_ptr<EVK::Interface> interface, int s
 			.type = EVK::DescriptorType::combinedImageSampler,
 			.binding = Pipeline_Skybox::cubemapBinding,
 			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-			.indicesExtra = {skyboxImageIndex},
+			.indicesExtra = {int(OtherImage::skybox)},
 			.indicesExtra2 = {skyboxSamplerIndex}
 		}
 	};
@@ -485,7 +483,7 @@ void BuildVkInterfaceStructures(std::shared_ptr<EVK::Interface> interface, int s
 			.type = EVK::DescriptorType::combinedImageSampler,
 			.binding = Pipeline_Final::textureBinding,
 			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-			.indicesExtra = {finalColourImageIndex},
+			.indicesExtra = {int(OtherImage::colour)},
 			.indicesExtra2 = {samplerMainIndex}
 		}
 	};
@@ -533,7 +531,7 @@ void BuildVkInterfaceStructures(std::shared_ptr<EVK::Interface> interface, int s
 			EVK::DescriptorType::storageImage,
 			Pipeline_Histogram::hdrImageBinding,
 			VK_SHADER_STAGE_COMPUTE_BIT,
-			{finalColourImageIndex}
+			{int(OtherImage::colour)}
 		},
 		{
 			EVK::DescriptorType::SBO,
@@ -598,7 +596,7 @@ void BuildVkInterfaceStructures(std::shared_ptr<EVK::Interface> interface, int s
 	};
 	EVK::LayeredBufferedRenderPassBlueprint lbrpb = {
 		.renderPassCI = lbBenderPassCreateInfo,
-		.targetTextureImageIndex = shadowMapImageIndex,
+		.targetTextureImageIndex = int(OtherImage::shadow_cascades),
 		.width = SHADOWMAP_DIM,
 		.height = SHADOWMAP_DIM,
 		.layersN = SHADOW_MAP_CASCADE_COUNT,
@@ -681,7 +679,7 @@ void BuildVkInterfaceStructures(std::shared_ptr<EVK::Interface> interface, int s
 	};
 	EVK::BufferedRenderPassBlueprint brpb = {
 		.renderPassCI = bRenderPassCreateInfo,
-		.targetTextureImageIndices = {finalColourImageIndex, finalDepthImageIndex},
+		.targetTextureImageIndices = {int(OtherImage::colour), int(OtherImage::depth)},
 		.width = 0, // resises with window
 	};
 	
@@ -698,7 +696,6 @@ void BuildVkInterfaceStructures(std::shared_ptr<EVK::Interface> interface, int s
 	interface->BuildBufferedRenderPass(0, brpb);
 	
 	interface->BuildLayeredBufferedRenderPass(0, lbrpb);
-	
 	
 	interface->BuildGraphicsPipeline((int)GraphicsPipeline::mainInstanced, pbMainInstanced);
 	interface->BuildGraphicsPipeline((int)GraphicsPipeline::mainOnce, pbMainOnce);

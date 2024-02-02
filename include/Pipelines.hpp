@@ -4,6 +4,6 @@
 #include "Header.hpp"
 
 std::shared_ptr<EVK::Interface> NewBuildPipelines(const EVK::Devices &devices);
-void BuildVkInterfaceStructures(std::shared_ptr<EVK::Interface> interface, int shadowMapImageIndex, int skyboxImageIndex, int finalColourImageIndex, int finalDepthImageIndex);
+void BuildVkInterfaceStructures(std::shared_ptr<EVK::Interface> interface, std::array<int, PNGS_N> pngsIndexArray);
 
 #endif /* Pipelines_hpp */

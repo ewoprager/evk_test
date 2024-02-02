@@ -92,11 +92,11 @@ static const uint32_t skyboxIndices[skyboxIndicesN] = {
 std::shared_ptr<EVK::Devices> devices {};
 std::shared_ptr<EVK::Interface> vulkan {};
 
-int imageIndex = 0;
+int imageIndex = OTHER_IMAGES_N;
 
 std::map<std::string, uint32_t> materialDictionary = {};
-std::vector<int> textureImageIndexArray(PNGS_N); // a texture ID is the index in this array at which the texture image index (in the `Vulkan` devices.instance) is stored
-int textureImageIndexCount = 0;
+std::array<int, PNGS_N> pngsIndexArray; // a texture ID is the index in this array at which the texture image index (in the `Vulkan` devices.instance) is stored
+int pngIndexIndex = 0;
 uint32_t GetTextureIdFromMtl(const char *usemtl){
 	if(materialDictionary.contains(std::string(usemtl))) return materialDictionary[std::string(usemtl)];
 	
@@ -110,10 +110,10 @@ uint32_t GetTextureIdFromMtl(const char *usemtl){
 	memcpy(buffer + prefixLength, usemtl, nameLength*sizeof(char));
 	memcpy(buffer + prefixLength + nameLength, suffix, suffixLength*sizeof(char));
 	vulkan->BuildTextureImageFromFile(imageIndex, {buffer});
-	textureImageIndexArray[textureImageIndexCount] = imageIndex;
+	pngsIndexArray[pngIndexIndex] = imageIndex;
 	++imageIndex;
-	materialDictionary[std::string(usemtl)] = textureImageIndexCount;
-	return textureImageIndexCount++;
+	materialDictionary[std::string(usemtl)] = pngIndexIndex;
+	return pngIndexIndex++;
 }
 
 #define OBJ_DATAS_N 4
@@ -401,7 +401,12 @@ int main(int argc, const char * argv[]) {
 	
 	vulkan = NewBuildPipelines(*devices);
 	
-	int skyboxImageIndex;
+	CallbackReceiver cr {vulkan};
+	SDL_Event event;
+	event.type = SDL_WINDOWEVENT;
+	event.window.event = SDL_WINDOWEVENT_SIZE_CHANGED;
+	ESDL::AddEventCallback((MemberFunction<CallbackReceiver, void, SDL_Event>){&cr, &CallbackReceiver::ResizeCallback}, event);
+	
 	{ // preparing skybox
 		std::array<std::string, 6> cubemapFiles = {{
 			"../Resources/textures/skybox_b.png", // correct
@@ -411,11 +416,9 @@ int main(int argc, const char * argv[]) {
 			"../Resources/textures/skybox_a.png", // correct
 			"../Resources/textures/skybox_c.png" // correct
 		}};
-		skyboxImageIndex = imageIndex;
-		vulkan->BuildCubemapImageFromFiles(imageIndex++, {cubemapFiles});
+		vulkan->BuildCubemapImageFromFiles(int(OtherImage::skybox), {cubemapFiles});
 	}
 	
-	int shadowImageIndex;
 	{
 		// For shadow mapping we only need a depth attachment
 		VkImageCreateInfo imageCI = {
@@ -435,11 +438,9 @@ int main(int argc, const char * argv[]) {
 			.samples = VK_SAMPLE_COUNT_1_BIT,
 			.sharingMode = VK_SHARING_MODE_EXCLUSIVE
 		};
-		shadowImageIndex = imageIndex;
-		vulkan->BuildTextureImage(imageIndex++, {imageCI, VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT});
+		vulkan->BuildTextureImage(int(OtherImage::shadow_cascades), {imageCI, VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT});
 	}
 	
-	int finalColourImageIndex, finalDepthImageIndex;
 	{
 		VkImageCreateInfo imageCI = {
 			.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -461,13 +462,11 @@ int main(int argc, const char * argv[]) {
 #endif
 			.sharingMode = VK_SHARING_MODE_EXCLUSIVE
 		};
-		finalColourImageIndex = imageIndex;
-		vulkan->BuildTextureImage(imageIndex++, {imageCI, VK_IMAGE_VIEW_TYPE_2D, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_COLOR_BIT});
+		vulkan->BuildTextureImage(int(OtherImage::colour), {imageCI, VK_IMAGE_VIEW_TYPE_2D, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_COLOR_BIT});
 		
 		imageCI.format = devices->FindDepthFormat();
 		imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		finalDepthImageIndex = imageIndex;
-		vulkan->BuildTextureImage(imageIndex++, {imageCI, VK_IMAGE_VIEW_TYPE_2D, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT});
+		vulkan->BuildTextureImage(int(OtherImage::depth), {imageCI, VK_IMAGE_VIEW_TYPE_2D, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT});
 	}
 	
 	objDatas[(int)ObjData::player] = ReadProcessedOBJFile("../Resources/ProcessedObjFiles/MaleLow.bin", &GetTextureIdFromMtl);
@@ -476,13 +475,17 @@ int main(int argc, const char * argv[]) {
 	planeData.divisionData[0].texture = GetTextureIdFromMtl("concrete-917");
 	objDatas[(int)ObjData::plane] = planeData;
 	
-	BuildVkInterfaceStructures(vulkan, shadowImageIndex, skyboxImageIndex, finalColourImageIndex, finalDepthImageIndex);
 	
-	CallbackReceiver cr {vulkan};
-	SDL_Event event;
-	event.type = SDL_WINDOWEVENT;
-	event.window.event = SDL_WINDOWEVENT_SIZE_CHANGED;
-	ESDL::AddEventCallback((MemberFunction<CallbackReceiver, void, SDL_Event>){&cr, &CallbackReceiver::ResizeCallback}, event);
+	BuildVkInterfaceStructures(vulkan, pngsIndexArray);
+	
+	// updating descriptor sets
+	for(int i=0; i<GRAPHICS_PIPELINES_N; ++i) vulkan->GP(i).UpdateDescriptorSets();
+	vulkan->CP(0).UpdateDescriptorSets();
+	
+	
+	// updated buffered render passes
+	vulkan->UpdateBufferedRenderPass(0);
+	vulkan->UpdateLayeredBufferedRenderPass(0);
 	
 	vulkan->FillVertexBuffer(Globals::HUD::vertexVBIndexOffset, (void *)hudVertices, sizeof(hudVertices));
 	vulkan->FillIndexBuffer(Globals::HUD::IBIndexOffset, (uint32_t *)hudIndices, hudIndicesN);
@@ -567,7 +570,7 @@ int main(int argc, const char * argv[]) {
 			// compute commands recorded with a pipeline image memory barrier
 			// begin compute command buffer
 			vulkan->BeginCompute();
-			vulkan->CmdPipelineImageMemoryBarrier(true, finalColourImageIndex, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
+			vulkan->CmdPipelineImageMemoryBarrier(true, int(OtherImage::colour), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
 			// submit to compute queue
 			vulkan->EndCompute();
 			

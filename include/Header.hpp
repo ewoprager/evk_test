@@ -35,9 +35,9 @@ enum class VertexBufferBinding {vertex, instance}; // binding locations for vert
 #define FINAL_FORMAT VK_FORMAT_R32G32B32A32_SFLOAT
 
 // texture images:
-#define SKY_BOXES_N 1 // cubemap
-#define SHADOW_MAPS_N 1 // layered image of shadow cascades
-#define FINAL_IMAGES_N 2 // colour, depth
+#define OTHER_IMAGES_N 4
+enum class OtherImage {skybox, shadow_cascades, colour, depth};
+
 #define PNGS_N 4 // debug, chair, chainsaw, concrete
 
 #define SHADOW_MAP_CASCADE_COUNT 4 // current implementation requires this to be 4, as cascade split values are passed to shader as a vec4.
