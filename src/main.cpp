@@ -483,8 +483,7 @@ int main(int argc, const char * argv[]) {
 	vulkan->CP(0).UpdateDescriptorSets();
 	
 	
-	// updated buffered render passes
-//	vulkan->AllocateOrResizeBufferedRenderPass(0, <#const vec<2, uint32_t> &size#>)(0);
+	// updated buffered render pass
 	vulkan->UpdateLayeredBufferedRenderPass(0);
 	
 	vulkan->FillVertexBuffer(Globals::HUD::vertexVBIndexOffset, (void *)hudVertices, sizeof(hudVertices));
