@@ -484,7 +484,7 @@ int main(int argc, const char * argv[]) {
 	
 	
 	// updated buffered render passes
-	vulkan->UpdateBufferedRenderPass(0);
+//	vulkan->AllocateOrResizeBufferedRenderPass(0, <#const vec<2, uint32_t> &size#>)(0);
 	vulkan->UpdateLayeredBufferedRenderPass(0);
 	
 	vulkan->FillVertexBuffer(Globals::HUD::vertexVBIndexOffset, (void *)hudVertices, sizeof(hudVertices));

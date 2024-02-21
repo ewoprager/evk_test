@@ -680,7 +680,7 @@ void BuildVkInterfaceStructures(std::shared_ptr<EVK::Interface> interface, std::
 	EVK::BufferedRenderPassBlueprint brpb = {
 		.renderPassCI = bRenderPassCreateInfo,
 		.targetTextureImageIndices = {int(OtherImage::colour), int(OtherImage::depth)},
-		.width = 0, // resises with window
+		.resizeWithSwapChain = true
 	};
 	
 	
