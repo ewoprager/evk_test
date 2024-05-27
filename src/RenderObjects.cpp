@@ -5,8 +5,9 @@ extern std::shared_ptr<EVK::Interface> vulkan;
 
 namespace Rendered {
 
-Once::Once(int _index, const ObjectData &_objData) : index(_index), objData(_objData) {
-	vulkan->FillVertexBuffer(Globals::MainOnce::vertexVBIndexOffset + _index, (void *)_objData.vertices, _objData.vertices_n*sizeof(Pipeline_MainOnce::Attributes::Vertex));
+Once::Once(std::shared_ptr<EVK::Interface> _interface, const ObjectData &_objData) : Parent(_interface), index(_index), objData(_objData) {
+	vbo = std::make_shared<EVK::VertexBufferObject>(interface->GetDevices());
+	vbo->Fill((void *)_objData.vertices, _objData.vertices_n * sizeof(PipelineMain::Vertex));
 }
 void Once::Render(const GraphicsPipeline &pipeline, Shared_Main::PushConstants_Vert *vertPcs, Shared_Main::PushConstants_Frag *fragPcs, Shared_Shadow::PushConstants_Vert *shadPcs){
 	
@@ -22,7 +23,7 @@ void Once::Render(const GraphicsPipeline &pipeline, Shared_Main::PushConstants_V
 	}
 }
 
-InstanceManager::InstanceManager(int _index, const ObjectData &_objData) : index(_index), objData(_objData) {
+InstanceManager::InstanceManager(std::shared_ptr<EVK::Interface> _interface, const ObjectData &_objData) : Parent(_interface), index(_index), objData(_objData) {
 	vulkan->FillVertexBuffer(Globals::MainInstanced::vertexVBIndexOffset + _index, (void *)_objData.vertices, _objData.vertices_n*sizeof(Pipeline_MainInstanced::Attributes::Vertex));
 }
 void InstanceManager::Update(float dT){

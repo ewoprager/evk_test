@@ -13,7 +13,12 @@ class Instance;
 
 class Parent {
 public:
-	virtual void Render(const GraphicsPipeline &pipeline, Shared_Main::PushConstants_Vert *vertPcs, Shared_Main::PushConstants_Frag *fragPcs, Shared_Shadow::PushConstants_Vert *shadPcs){}
+	Parent(std::shared_ptr<EVK::Interface> _interface) : interface(_interface) {}
+	
+	virtual void Render(const GraphicsPipeline &pipeline, Shared_Main::PushConstants_Vert *vertPcs, Shared_Main::PushConstants_Frag *fragPcs, Shared_Shadow::PushConstants_Vert *shadPcs) = 0;
+	
+protected:
+	std::shared_ptr<EVK::Interface> interface;
 };
 
 class Once : public Parent {
@@ -25,7 +30,7 @@ public:
 	void Render(const GraphicsPipeline &pipeline, Shared_Main::PushConstants_Vert *vertPcs, Shared_Main::PushConstants_Frag *fragPcs, Shared_Shadow::PushConstants_Vert *shadPcs) override;
 	
 private:
-	int index;
+	std::shared_ptr<EVK::VertexBufferObject> vbo;
 	ObjectData objData;
 };
 
@@ -66,7 +71,7 @@ private:
 	int index;
 	ObjectData objData;
 	
-	Shared_Main::PerObject instanceData[MAX_INSTANCES];
+	PerObject instanceData[MAX_INSTANCES];
 	Instance *instances[MAX_INSTANCES];
 	int instanceCount = 0;
 };

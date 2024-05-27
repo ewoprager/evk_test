@@ -555,7 +555,7 @@ int main(int argc, const char * argv[]) {
 			vulkan->CmdBeginBufferedRenderPass(0, VK_SUBPASS_CONTENTS_INLINE, clearVals);
 			
 			vulkan->GP((int)GraphicsPipeline::skybox).Bind();
-			vulkan->GP((int)GraphicsPipeline::skybox).BindDescriptorSets(0, Pipeline_Skybox::descriptorSetsN);
+			vulkan->GP((int)GraphicsPipeline::skybox).BindDescriptorSets();
 			vulkan->CmdBindVertexBuffer(0, Globals::Skybox::vertexVBIndexOffset);
 			vulkan->CmdBindIndexBuffer(Globals::Skybox::IBIndexOffset, VK_INDEX_TYPE_UINT32);
 			vulkan->CmdDrawIndexed(vulkan->GetIndexBufferCount(Globals::Skybox::IBIndexOffset));
@@ -578,7 +578,7 @@ int main(int argc, const char * argv[]) {
 			vulkan->BeginFinalRenderPass({{1.0f, 1.0f, 1.0f, 1.0f}}); // begin with a pipeline buffer memory barrier
 			
 			vulkan->GP((int)GraphicsPipeline::finall).Bind();
-			vulkan->GP((int)GraphicsPipeline::finall).BindDescriptorSets(0, 1);
+			vulkan->GP((int)GraphicsPipeline::finall).BindDescriptorSets();
 			vulkan->CmdBindVertexBuffer(0, Globals::Finall::vertexVBIndexOffset);
 			vulkan->CmdBindIndexBuffer(Globals::Finall::IBIndexOffset, VK_INDEX_TYPE_UINT32);
 			vulkan->CmdDrawIndexed(vulkan->GetIndexBufferCount(Globals::Finall::IBIndexOffset));
