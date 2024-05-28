@@ -1,7 +1,7 @@
 #include "CascadedShadowMap.hpp"
 
 // requires the camera projection and viewInverse matrices to be already set in the Main Global UBO
-void UpdateCascades(Shared_Main::UBO_Global *mainUboGlobal, Shared_Shadow::UBO_Global *shadowUboGlobal){
+void UpdateCascades(PipelineMain::UBO_Global *mainUboGlobal, PipelineShadow::UBO_Global *shadowUboGlobal){
 	float cascadeSplits[SHADOW_MAP_CASCADE_COUNT];
 	
 	float minZ = Globals::cameraZNear;
