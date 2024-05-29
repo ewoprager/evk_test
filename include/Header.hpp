@@ -167,38 +167,23 @@ struct Pipeline_Histogram {
 // Global constants
 struct Globals {
 	struct MainInstanced {
-		static constexpr int vertexVBIndexOffset = 0;									// first vertex buffer index for per-vertex data
 		static const int renderedN = 1; // note that for instanced rendering, each object gets two vertex buffers: one for per-vertex data and one for per-devices.instance data
-		
-		static constexpr int IBIndexOffset = 0;											// first index buffer index
 		static const int indexedN = 0;													// number of objects that are rendered indexed (each of which gets an index buffer)
 	};
 	struct MainOnce {
-		static constexpr int vertexVBIndexOffset = MainInstanced::vertexVBIndexOffset + 2*MainInstanced::renderedN; // the two is because the instanced rendering in 'MainInstanced' requires 2 vertex buffers per object
 		static const int renderedN = 3;
-		
-		static constexpr int IBIndexOffset = MainInstanced::IBIndexOffset + MainInstanced::indexedN;
 		static const int indexedN = 0;
 	};
 	struct HUD {
-		static constexpr int vertexVBIndexOffset = MainOnce::vertexVBIndexOffset + MainOnce::renderedN;
 		static const int renderedN = 1;
-		
-		static constexpr int IBIndexOffset = MainOnce::IBIndexOffset + MainOnce::indexedN;
 		static const int indexedN = 1;
 	};
 	struct Skybox {
-		static constexpr int vertexVBIndexOffset = HUD::vertexVBIndexOffset + HUD::renderedN;
 		static const int renderedN = 1;
-		
-		static constexpr int IBIndexOffset = HUD::IBIndexOffset + HUD::indexedN;
 		static const int indexedN = 1;
 	};
 	struct Finall {
-		static constexpr int vertexVBIndexOffset = Skybox::vertexVBIndexOffset + Skybox::renderedN;
 		static const int renderedN = 1;
-		
-		static constexpr int IBIndexOffset = Skybox::IBIndexOffset + Skybox::indexedN;
 		static const int indexedN = 1;
 	};
 	

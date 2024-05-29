@@ -384,6 +384,7 @@ void RenderScene(VkCommandBuffer commandBuffer, uint32_t flight, Shared_Main::Pu
 			for(int j=0; j<info.n; ++j){
 				Rendered::Info::Draw draw = info.drawFunction(j);
 				fragPcs.textureID = draw.textureId;
+				pipelineMainInstanced->CmdPushConstants<0>(commandBuffer, &fragPcs);
 				interface->CmdDraw(draw.vertexCount, draw.instanceCount, draw.firstVertex, draw.firstInstance);
 			}
 		}
@@ -401,6 +402,7 @@ void RenderScene(VkCommandBuffer commandBuffer, uint32_t flight, Shared_Main::Pu
 			for(int j=0; j<info.n; ++j){
 				Rendered::Info::Draw draw = info.drawFunction(j);
 				fragPcs.textureID = draw.textureId;
+				pipelineMainOnce->CmdPushConstants<0>(commandBuffer, &fragPcs);
 				interface->CmdDraw(draw.vertexCount, draw.instanceCount, draw.firstVertex, draw.firstInstance);
 			}
 		} else {
