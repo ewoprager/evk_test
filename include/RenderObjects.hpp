@@ -10,22 +10,32 @@ class Once;
 class InstanceManager;
 class Instance;
 
-
-class Parent {
-public:
-	virtual void Render(const GraphicsPipeline &pipeline, Shared_Main::PushConstants_Vert *vertPcs, Shared_Main::PushConstants_Frag *fragPcs, Shared_Shadow::PushConstants_Vert *shadPcs){}
+struct Info {
+	uint32_t n;
+	float shininess;
+		
+	struct Draw {
+		int32_t textureId;
+		uint32_t vertexCount;
+		uint32_t instanceCount = 1;
+		uint32_t firstVertex = 0;
+		uint32_t firstInstance = 0;
+	};
+	std::function<Draw(uint32_t)> drawFunction;
 };
 
-class Once : public Parent {
+class Once {
 public:
-	Once(int _index, const ObjectData &_objData);
-	~Once(){}
+	Once(std::shared_ptr<EVK::Devices> _devices, const ObjectData &_objData);
+	~Once() = default;
 	
-	virtual void Update(float dT, Shared_Main::PerObject *perObjectDataPtr){}
-	void Render(const GraphicsPipeline &pipeline, Shared_Main::PushConstants_Vert *vertPcs, Shared_Main::PushConstants_Frag *fragPcs, Shared_Shadow::PushConstants_Vert *shadPcs) override;
+	virtual void Update(float dT, PerObject *perObjectDataPtr) {}
+	
+	virtual Info Render(VkCommandBuffer commandBuffer);
 	
 private:
-	int index;
+	std::shared_ptr<EVK::Devices> devices;
+	std::shared_ptr<EVK::VertexBufferObject> vbo;
 	ObjectData objData;
 };
 
@@ -34,23 +44,25 @@ public:
 	Instance(InstanceManager *_manager);
 	~Instance();
 	
-	virtual void Update(float dT, Shared_Main::PerObject *perObjectDataPtr){}
+	virtual void Update(float dT, PerObject *perObjectDataPtr) {}
 	
 private:
 	InstanceManager *manager;
 };
 
-class InstanceManager : public Parent {
+class InstanceManager {
 public:
-	InstanceManager(int _index, const ObjectData &_objData);
-	~InstanceManager(){}
+	InstanceManager(std::shared_ptr<EVK::Devices> _devices, const ObjectData &_objData);
+	~InstanceManager() = default;
 	
 	void Update(float dT);
-	void Render(const GraphicsPipeline &pipeline, Shared_Main::PushConstants_Vert *vertPcs, Shared_Main::PushConstants_Frag *fragPcs, Shared_Shadow::PushConstants_Vert *shadPcs) override;
+	
+	virtual Info Render(VkCommandBuffer commandBuffer);
 	
 	void AddInstance(Instance *ptr){
 		instances[instanceCount++] = ptr;
 	}
+	
 	void RemoveInstance(Instance *ptr){
 		for(int i=0; i<instanceCount; i++){
 			if(instances[i] == ptr){
@@ -63,14 +75,16 @@ public:
 	}
 	
 private:
-	int index;
+	std::shared_ptr<EVK::Devices> devices;
+	std::shared_ptr<EVK::VertexBufferObject> vboVertex;
+	std::shared_ptr<EVK::VertexBufferObject> vboInstance;
 	ObjectData objData;
 	
-	Shared_Main::PerObject instanceData[MAX_INSTANCES];
+	PerObject instanceData[MAX_INSTANCES];
 	Instance *instances[MAX_INSTANCES];
 	int instanceCount = 0;
 };
 
-}
+} // namespace Rendered
 
 #endif /* RenderObjects_hpp */

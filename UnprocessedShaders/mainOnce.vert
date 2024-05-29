@@ -17,10 +17,6 @@ layout(set = 1, binding = 0) uniform UBO_PerObject {
 	mat4 modelInvT;
 } ubo_po;
 
-layout(push_constant) uniform PCs {
-	int placeHolder;
-} pcs;
-
 layout(location = 0) in vec3 a_position;
 layout(location = 1) in vec3 a_normal;
 layout(location = 2) in vec2 a_texCoord;
